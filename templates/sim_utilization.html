@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}SIM Issuance · UREMBO{% endblock %}
+
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>SIM Issuance & Utilization</h1>
+    <p>Track SIM issuance, activation, and retailer performance</p>
+  </div>
+</header>
+
+{% if latest %}
+<section class="stats-grid">
+  <article class="stat-card highlight">
+    <span class="label">Utilization Rate</span>
+    <strong>{{ latest.utilization_rate }}%</strong>
+    <small>Latest report</small>
+  </article>
+  <article class="stat-card">
+    <span class="label">Total SIMs</span>
+    <strong>{{ latest.total_sims }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="label">Activated SIMs</span>
+    <strong>{{ latest.activated_sims }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="label">DSO ID</span>
+    <strong>{{ latest.dso_id or '—' }}</strong>
+    <small>{{ latest.distributor_name or '' }}</small>
+  </article>
+</section>
+
+<section class="grid-2">
+  <article class="panel">
+    <h2>Zone Breakdown</h2>
+    <table>
+      <thead><tr><th>Zone</th><th>Total</th><th>Activated</th><th>Rate</th></tr></thead>
+      <tbody>
+        {% for row in zone_breakdown %}
+        <tr>
+          <td>{{ row.zone }}</td>
+          <td>{{ row.total }}</td>
+          <td>{{ row.activated }}</td>
+          <td>{{ '%.1f'|format((row.activated / row.total * 100) if row.total else 0) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  <article class="panel">
+    <h2>Top Retailers</h2>
+    <table>
+      <thead><tr><th>Retailer MSISDN</th><th>SIM Count</th></tr></thead>
+      <tbody>
+        {% for row in retailer_breakdown %}
+        <tr><td>{{ row.retailer }}</td><td>{{ row.count }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>Report History</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Total</th><th>Activated</th><th>Utilization</th></tr></thead>
+    <tbody>
+      {% for report in reports %}
+      <tr>
+        <td>{{ report.report_date or report.created_at.date() }}</td>
+        <td>{{ report.total_sims }}</td>
+        <td>{{ report.activated_sims }}</td>
+        <td>{{ report.utilization_rate }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% else %}
+<section class="panel empty-state">
+  <h2>No SIM utilization reports yet</h2>
+  <p>Click Sync Now after Joyce receives the next Airtel Excel report.</p>
+</section>
+{% endif %}
+{% endblock %}

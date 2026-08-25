@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · UREMBO{% endblock %}
+
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Performance Dashboard</h1>
+    <p>Latest Airtel intelligence for Joyce Gachoki</p>
+  </div>
+</header>
+
+{% if alerts %}
+<section class="alerts">
+  {% for alert in alerts %}
+  <div class="alert alert-{{ alert.level }}">{{ alert.message }}</div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<section class="stats-grid">
+  <article class="stat-card highlight">
+    <span class="label">Projected Commission</span>
+    <strong>{{ partner.projected_commission | int if partner and partner.projected_commission else '—' }}</strong>
+    <small>KES back margin</small>
+  </article>
+  <article class="stat-card">
+    <span class="label">Partner Gross Adds</span>
+    <strong>{{ partner.partner_gross_adds if partner else '—' }}</strong>
+    <small>MTD</small>
+  </article>
+  <article class="stat-card">
+    <span class="label">SIM Utilization</span>
+    <strong>{{ sim.utilization_rate ~ '%' if sim else '—' }}</strong>
+    <small>{{ sim.activated_sims if sim else 0 }} / {{ sim.total_sims if sim else 0 }} activated</small>
+  </article>
+  <article class="stat-card">
+    <span class="label">Active Tudor Agents</span>
+    <strong>{{ tudor.active_agents if tudor else '—' }}</strong>
+    <small>{{ tudor.ama_1plus_count if tudor else 0 }} with AMA 1+</small>
+  </article>
+</section>
+
+<section class="grid-2">
+  <article class="panel">
+    <h2>Commission Trend</h2>
+    <canvas id="commissionChart"></canvas>
+  </article>
+  <article class="panel">
+    <h2>SIM Utilization Trend</h2>
+    <canvas id="utilizationChart"></canvas>
+  </article>
+</section>
+
+<section class="grid-2">
+  <article class="panel">
+    <h2>Latest Summary</h2>
+    <ul class="summary-list">
+      <li><span>Contract Status</span><strong>{{ partner.contract_status or '—' }}</strong></li>
+      <li><span>Total Airtime</span><strong>{{ partner.total_airtime | int if partner and partner.total_airtime else '—' }}</strong></li>
+      <li><span>Active Agents %</span><strong>{{ partner.active_agents_pct ~ '%' if partner and partner.active_agents_pct else '—' }}</strong></li>
+      <li><span>Total SIMs Issued</span><strong>{{ sim.total_sims if sim else '—' }}</strong></li>
+      <li><span>Distributor</span><strong>{{ sim.distributor_name if sim else '—' }}</strong></li>
+    </ul>
+  </article>
+  <article class="panel">
+    <h2>Top Performing Agents</h2>
+    {% if top_agents %}
+    <table>
+      <thead>
+        <tr><th>Agent</th><th>Site</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for agent in top_agents %}
+        <tr>
+          <td>{{ agent.agent_name }}</td>
+          <td>{{ agent.site }}</td>
+          <td><span class="pill success">AMA 1+</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No Tudor agent data yet. Sync will pull reports from Gmail.</p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.UREMBO_CHARTS = {
+    commission: {{ commission_trend | tojson }},
+    utilization: {{ utilization_trend | tojson }}
+  };
+</script>
+{% endblock %}

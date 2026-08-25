@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Connect Gmail · UREMBO{% endblock %}
+
+{% block content %}
+<section class="connect-card">
+  <div class="hero-badge">Airtel Super Agent · Mombasa</div>
+  <h1>UREMBO</h1>
+  <p>Connect Joyce's Gmail to sync Airtel performance reports automatically.</p>
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <a href="{{ url_for('auth.connect_gmail') }}" class="btn btn-primary">Connect Gmail Account</a>
+  <p class="hint">Reports synced hourly: Partner Performance, SIM Utilization, Tudor Agents.</p>
+</section>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Partner Performance · UREMBO{% endblock %}
+
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Partner Performance Report</h1>
+    <p>Airtel KPIs, airtime metrics, and commission projection</p>
+  </div>
+</header>
+
+{% if latest %}
+<section class="stats-grid">
+  <article class="stat-card highlight">
+    <span class="label">Projected Commission</span>
+    <strong>{{ latest.projected_commission | int if latest.projected_commission else '—' }}</strong>
+    <small>KES</small>
+  </article>
+  <article class="stat-card">
+    <span class="label">Partner Gross Adds</span>
+    <strong>{{ latest.partner_gross_adds or '—' }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="label">Total Airtime</span>
+    <strong>{{ latest.total_airtime | int if latest.total_airtime else '—' }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="label">Contract Status</span>
+    <strong>{{ latest.contract_status or '—' }}</strong>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>Latest KPI Breakdown</h2>
+  <table>
+    <thead><tr><th>KPI</th><th>MTD</th><th>Back Margin Rate</th></tr></thead>
+    <tbody>
+      <tr><td>Partner Gross Adds</td><td>{{ latest.partner_gross_adds or '—' }}</td><td>—</td></tr>
+      <tr><td>SIM Kits Billing</td><td>{{ latest.sim_kits_billing or '—' }}</td><td>—</td></tr>
+      <tr><td>% Active Agents</td><td>{{ latest.active_agents_pct ~ '%' if latest.active_agents_pct else '—' }}</td><td>—</td></tr>
+      <tr><td>Back Margin Rate</td><td>—</td><td>{{ latest.back_margin_rate ~ '%' if latest.back_margin_rate else '—' }}</td></tr>
+      <tr><td>Primaries Purchased</td><td>{{ latest.primaries_purchased | int if latest.primaries_purchased else '—' }}</td><td>—</td></tr>
+      <tr><td>Agent Led Airtime (Direct)</td><td>{{ latest.agent_led_airtime | int if latest.agent_led_airtime else '—' }}</td><td>—</td></tr>
+      <tr><td>Retailer Influenced Self Recharges</td><td>{{ latest.retailer_influenced_recharges | int if latest.retailer_influenced_recharges else '—' }}</td><td>—</td></tr>
+      <tr><td>Total Airtime</td><td>{{ latest.total_airtime | int if latest.total_airtime else '—' }}</td><td>—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="grid-2">
+  <article class="panel">
+    <h2>Airtel Money Opportunity</h2>
+    <ul class="summary-list">
+      <li><span>Total Agents in Cluster</span><strong>{{ latest.total_agents_cluster or '—' }}</strong></li>
+      <li><span>Agents Served 1K+ & 5TXN</span><strong>{{ latest.agents_served_1k_5txn or '—' }}</strong></li>
+    </ul>
+  </article>
+  <article class="panel">
+    <h2>Report History</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Commission</th><th>Gross Adds</th></tr></thead>
+      <tbody>
+        {% for report in reports %}
+        <tr>
+          <td>{{ report.report_date or report.created_at.date() }}</td>
+          <td>{{ report.projected_commission | int if report.projected_commission else '—' }}</td>
+          <td>{{ report.partner_gross_adds or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+</section>
+{% else %}
+<section class="panel empty-state">
+  <h2>No partner performance reports yet</h2>
+  <p>Reports from <code>@ke.airtel.com</code> with subject "PARTNER PERFORMANCE" will appear here.</p>
+</section>
+{% endif %}
+{% endblock %}

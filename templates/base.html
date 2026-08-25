@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}UREMBO{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  {% if session.get('connected') %}
+  <nav class="navbar">
+    <div class="brand">
+      <span class="brand-mark">U</span>
+      <div>
+        <strong>UREMBO</strong>
+        <small>Email Intelligence</small>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="{{ url_for('dashboard.dashboard') }}" class="{% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}">Dashboard</a>
+      <a href="{{ url_for('dashboard.sim_utilization') }}" class="{% if request.endpoint == 'dashboard.sim_utilization' %}active{% endif %}">SIM Issuance</a>
+      <a href="{{ url_for('dashboard.partner_performance') }}" class="{% if request.endpoint == 'dashboard.partner_performance' %}active{% endif %}">Partner Performance</a>
+    </div>
+    <div class="nav-actions">
+      <button id="sync-btn" class="btn btn-light">Sync Now</button>
+      <a href="{{ url_for('auth.logout') }}" class="btn btn-outline">Logout</a>
+    </div>
+  </nav>
+  {% endif %}
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
