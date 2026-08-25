@@ -1,5 +1,6 @@
 import base64
 import hashlib
+from datetime import timezone
 
 from cryptography.fernet import Fernet
 from google.oauth2.credentials import Credentials
@@ -28,6 +29,14 @@ def decrypt_value(value):
     return _fernet().decrypt(value.encode()).decode()
 
 
+def _normalize_expiry(expiry):
+    if expiry is None:
+        return None
+    if expiry.tzinfo is not None:
+        expiry = expiry.astimezone(timezone.utc).replace(tzinfo=None)
+    return expiry
+
+
 def save_credentials(email, credentials):
     token = OAuthToken.query.filter_by(email=email.lower()).first()
     if not token:
@@ -36,7 +45,7 @@ def save_credentials(email, credentials):
 
     token.access_token_enc = encrypt_value(credentials.token)
     token.refresh_token_enc = encrypt_value(credentials.refresh_token)
-    token.token_expiry = credentials.expiry
+    token.token_expiry = _normalize_expiry(credentials.expiry)
     token.updated_at = utcnow()
     db.session.commit()
     return token
@@ -55,7 +64,7 @@ def load_credentials(email):
         client_secret=Config.GOOGLE_CLIENT_SECRET,
         scopes=["https://www.googleapis.com/auth/gmail.readonly"],
     )
-    credentials.expiry = token.token_expiry
+    credentials.expiry = _normalize_expiry(token.token_expiry)
 
     if credentials.expired and credentials.refresh_token:
         credentials.refresh(Request())

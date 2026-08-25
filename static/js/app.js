@@ -48,21 +48,29 @@ document.addEventListener("DOMContentLoaded", () => {
   const syncBtn = document.getElementById("sync-btn");
   if (syncBtn) {
     syncBtn.addEventListener("click", async () => {
+      const defaultLabel = syncBtn.textContent;
       syncBtn.disabled = true;
       syncBtn.textContent = "Syncing...";
+
       try {
         const response = await fetch("/api/sync", { method: "POST" });
-        const data = await response.json();
-        if (data.error) {
-          alert(data.error);
-        } else {
-          window.location.reload();
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          throw new Error("Unexpected server response during sync.");
         }
+
+        if (!response.ok || data.error) {
+          throw new Error(data.error || "Sync failed. Please try again.");
+        }
+
+        syncBtn.textContent = "Synced!";
+        window.location.reload();
       } catch (error) {
-        alert("Sync failed. Please try again.");
-      } finally {
         syncBtn.disabled = false;
-        syncBtn.textContent = "Sync Now";
+        syncBtn.textContent = defaultLabel;
+        alert(error.message || "Sync failed. Please try again.");
       }
     });
   }

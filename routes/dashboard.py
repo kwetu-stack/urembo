@@ -65,5 +65,8 @@ def api_dashboard():
 @login_required
 def api_sync():
     from flask import current_app
-    result = sync_gmail_reports(current_app._get_current_object())
-    return jsonify(result)
+    try:
+        result = sync_gmail_reports(current_app._get_current_object())
+        return jsonify(result)
+    except Exception as exc:
+        return jsonify({"processed": 0, "error": str(exc)}), 500
