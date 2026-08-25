@@ -11,3 +11,7 @@ class Config:
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
     BASE_URL = os.getenv("BASE_URL", "http://127.0.0.1:5000")
+
+    SESSION_COOKIE_SECURE = BASE_URL.startswith("https://")
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
