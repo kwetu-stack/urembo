@@ -35,6 +35,8 @@ GMAIL_QUERY = (
 
 TUDOR_QUERY = 'subject:TUDOR OR filename:TUDOR OR subject:AGENT'
 
+ATTACHMENT_QUERY = 'has:attachment (filename:xlsx OR filename:xls OR filename:csv)'
+
 REPORT_MODELS = {
     "partner_performance": PartnerPerformanceReport,
     "sim_utilization": SimUtilizationReport,
@@ -321,15 +323,15 @@ def sync_gmail_reports(app):
         return {"processed": processed, "failed": failed, "error": None}
 
 
-def inspect_tudor_messages(app, limit=25):
-    """Report what Gmail returns for Tudor-looking mail and how sync would classify it."""
+def inspect_messages(app, query, limit=25):
+    """Report what Gmail returns for a query and how sync would classify each message."""
     with app.app_context():
         service = get_gmail_service()
         if not service:
-            return {"error": "No connected Gmail account", "messages": []}
+            return {"error": "No connected Gmail account", "query": query, "messages": []}
 
         response = service.users().messages().list(
-            userId="me", q=TUDOR_QUERY, maxResults=limit
+            userId="me", q=query, maxResults=limit
         ).execute()
 
         messages = []
@@ -363,4 +365,13 @@ def inspect_tudor_messages(app, limit=25):
         for entry, message in zip(messages, response.get("messages", [])):
             entry["matches_sync_query"] = message["id"] in synced_ids
 
-        return {"error": None, "messages": messages}
+        return {"error": None, "query": query, "messages": messages}
+
+
+def inspect_tudor_messages(app, limit=25):
+    return inspect_messages(app, TUDOR_QUERY, limit=limit)
+
+
+def inspect_attachment_messages(app, limit=40):
+    """Every recent spreadsheet attachment, to find reports the classifier is missing."""
+    return inspect_messages(app, ATTACHMENT_QUERY, limit=limit)
