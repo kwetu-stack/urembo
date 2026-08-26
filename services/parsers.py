@@ -182,9 +182,27 @@ def parse_sim_utilization_excel(file_bytes, subject, received_at=None):
     }
 
 
+TUDOR_HEADER_MARKERS = {"AGENT", "AGENT NAME", "AGENT STATUS"}
+
+
+def _read_tudor_sheet(file_bytes, max_header_row=10):
+    """Read the agent sheet, locating the header row instead of assuming its position."""
+    raw = pd.read_excel(BytesIO(file_bytes), sheet_name=0, header=None)
+
+    header_row = 0
+    for index in range(min(max_header_row, len(raw))):
+        values = {str(v).strip().upper() for v in raw.iloc[index].tolist()}
+        if values & TUDOR_HEADER_MARKERS:
+            header_row = index
+            break
+
+    df = raw.iloc[header_row + 1:].copy()
+    df.columns = [str(c).strip().upper() for c in raw.iloc[header_row].tolist()]
+    return df
+
+
 def parse_tudor_agents_excel(file_bytes, subject, received_at=None):
-    df = pd.read_excel(BytesIO(file_bytes), sheet_name=0, header=2)
-    df.columns = [str(c).strip().upper() for c in df.columns]
+    df = _read_tudor_sheet(file_bytes)
 
     agents = []
     for _, row in df.iterrows():
