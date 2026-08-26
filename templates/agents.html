@@ -128,7 +128,7 @@
 {% else %}
 <section class="panel empty-state">
   <h2>No agent reports yet</h2>
-  <p>Tudor agent workbooks synced from Gmail will appear here.</p>
+  <p>Tudor agent workbooks synced from Gmail will appear here. Click <strong>Sync Now</strong> to pull them; if the page stays empty, open <a href="{{ url_for('dashboard.api_diagnostics') }}">/api/diagnostics</a> to see which Tudor emails the sync found.</p>
 </section>
 {% endif %}
 {% endblock %}

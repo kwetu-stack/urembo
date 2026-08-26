@@ -3,6 +3,13 @@ from functools import wraps
 from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
 
 from config import Config
+from models import (
+    PartnerPerformanceReport,
+    SimUtilizationReport,
+    SyncedEmail,
+    TudorAgent,
+    TudorAgentReport,
+)
 from services.analytics import (
     get_agents_page,
     get_dashboard_data,
@@ -10,7 +17,7 @@ from services.analytics import (
     get_sim_utilization_page,
     get_tudor_summary,
 )
-from services.sync_service import sync_gmail_reports
+from services.sync_service import GMAIL_QUERY, inspect_tudor_messages, sync_gmail_reports
 from services.token_store import has_connected_account
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -70,6 +77,39 @@ def api_dashboard():
         "alerts": data["alerts"],
         "commission_trend": data["commission_trend"],
         "utilization_trend": data["utilization_trend"],
+    })
+
+
+@dashboard_bp.route("/api/diagnostics")
+@login_required
+def api_diagnostics():
+    """What sync has stored, and how Tudor-looking mail in the inbox would be classified."""
+    synced = SyncedEmail.query.order_by(SyncedEmail.received_at.desc()).limit(25).all()
+    try:
+        tudor_scan = inspect_tudor_messages(current_app._get_current_object())
+    except Exception:
+        current_app.logger.exception("Tudor inbox scan failed")
+        tudor_scan = {"error": "Inbox scan failed", "messages": []}
+    return jsonify({
+        "gmail_query": GMAIL_QUERY,
+        "allowed_sender_domains": Config.AIRTEL_SENDER_DOMAINS,
+        "counts": {
+            "synced_emails": SyncedEmail.query.count(),
+            "partner_performance_reports": PartnerPerformanceReport.query.count(),
+            "sim_utilization_reports": SimUtilizationReport.query.count(),
+            "tudor_agent_reports": TudorAgentReport.query.count(),
+            "tudor_agents": TudorAgent.query.count(),
+        },
+        "recent_synced_emails": [
+            {
+                "subject": email.subject,
+                "sender": email.sender,
+                "received_at": email.received_at.isoformat() if email.received_at else None,
+                "report_type": email.report_type,
+            }
+            for email in synced
+        ],
+        "tudor_inbox_scan": tudor_scan,
     })
 
 
