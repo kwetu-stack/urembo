@@ -1,6 +1,6 @@
 from functools import wraps
 
-from flask import Blueprint, jsonify, redirect, render_template, session, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, session, url_for
 
 from config import Config
 from services.analytics import (
@@ -64,9 +64,13 @@ def api_dashboard():
 @dashboard_bp.route("/api/sync", methods=["POST"])
 @login_required
 def api_sync():
-    from flask import current_app
     try:
         result = sync_gmail_reports(current_app._get_current_object())
         return jsonify(result)
-    except Exception as exc:
-        return jsonify({"processed": 0, "error": str(exc)}), 500
+    except Exception:
+        current_app.logger.exception("Gmail sync failed")
+        return jsonify({
+            "processed": 0,
+            "failed": 0,
+            "error": "Sync failed. Please try again or contact support if it keeps happening.",
+        }), 500

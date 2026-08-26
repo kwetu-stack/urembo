@@ -9,6 +9,12 @@
   </div>
 </header>
 
+{% if not partner and not sim and not tudor %}
+<section class="alerts">
+  <div class="alert alert-info">No reports synced yet. Click "Sync Now" to pull the latest Airtel reports from Gmail.</div>
+</section>
+{% endif %}
+
 {% if alerts %}
 <section class="alerts">
   {% for alert in alerts %}

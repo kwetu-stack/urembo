@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
+from flask import current_app
 from googleapiclient.discovery import build
 
 from config import Config
@@ -32,10 +33,12 @@ GMAIL_QUERY = (
 
 
 def _naive(dt):
-    if dt is None:
+    if dt is None or dt != dt:
         return None
     if hasattr(dt, "to_pydatetime"):
         dt = dt.to_pydatetime()
+    if not isinstance(dt, datetime):
+        return None
     if dt.tzinfo is not None:
         return dt.replace(tzinfo=None)
     return dt
@@ -263,9 +266,10 @@ def sync_gmail_reports(app):
     with app.app_context():
         service = get_gmail_service()
         if not service:
-            return {"processed": 0, "error": "No connected Gmail account"}
+            return {"processed": 0, "failed": 0, "error": "No connected Gmail account"}
 
         processed = 0
+        failed = 0
         page_token = None
         while True:
             response = service.users().messages().list(
@@ -276,11 +280,18 @@ def sync_gmail_reports(app):
             ).execute()
 
             for message in response.get("messages", []):
-                if process_message(service, message):
-                    processed += 1
+                try:
+                    if process_message(service, message):
+                        processed += 1
+                except Exception:
+                    db.session.rollback()
+                    failed += 1
+                    current_app.logger.exception(
+                        "Failed to process Gmail message %s", message.get("id")
+                    )
 
             page_token = response.get("nextPageToken")
             if not page_token:
                 break
 
-        return {"processed": processed, "error": None}
+        return {"processed": processed, "failed": failed, "error": None}
