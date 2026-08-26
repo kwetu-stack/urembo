@@ -120,6 +120,24 @@ th { color: var(--muted); font-size: .85rem; }
   display: inline-block; padding: .2rem .55rem; border-radius: 999px; font-size: .75rem;
 }
 .pill.success { background: #ecfdf5; color: var(--success); }
+.pill.muted { background: #f3f4f6; color: var(--muted); }
+
+.btn-ghost { background: #f3f4f6; color: var(--text); }
+
+.filter-bar {
+  display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.filter-bar input, .filter-bar select {
+  padding: .65rem .75rem; border: 1px solid var(--border);
+  border-radius: 10px; font: inherit; color: var(--text); background: #fff;
+}
+.filter-bar input { flex: 1; min-width: 220px; }
+
+.pagination {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap; margin-top: 1rem; color: var(--muted);
+}
+.pagination-links { display: flex; gap: .5rem; }
 
 @media (max-width: 768px) {
   .navbar { flex-direction: column; align-items: stretch; }
