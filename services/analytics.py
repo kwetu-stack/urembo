@@ -172,3 +172,85 @@ def get_tudor_summary():
         .all()
     )
     return {"latest": latest, "agents": agents}
+
+
+AGENTS_PER_PAGE = 50
+
+
+def get_agents_page(search=None, status=None, page=1, per_page=AGENTS_PER_PAGE):
+    latest = _latest(TudorAgentReport)
+    reports = TudorAgentReport.query.order_by(
+        desc(TudorAgentReport.report_date),
+        desc(TudorAgentReport.id),
+    ).all()
+
+    empty = {
+        "latest": None,
+        "reports": reports,
+        "agents": None,
+        "site_breakdown": [],
+        "tse_breakdown": [],
+        "search": search,
+        "status": status,
+    }
+    if not latest:
+        return empty
+
+    query = TudorAgent.query.filter_by(report_id=latest.id)
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(
+            TudorAgent.agent_name.ilike(pattern)
+            | TudorAgent.agent_id.ilike(pattern)
+            | TudorAgent.site.ilike(pattern)
+            | TudorAgent.tse.ilike(pattern)
+        )
+    if status:
+        query = query.filter(func.lower(TudorAgent.agent_status) == status.lower())
+
+    agents = query.order_by(TudorAgent.agent_name.asc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+
+    site_rows = (
+        TudorAgent.query
+        .filter_by(report_id=latest.id)
+        .with_entities(
+            TudorAgent.site,
+            func.count(TudorAgent.id),
+            func.sum(case((func.lower(TudorAgent.agent_status) == "active", 1), else_=0)),
+        )
+        .group_by(TudorAgent.site)
+        .order_by(desc(func.count(TudorAgent.id)))
+        .limit(10)
+        .all()
+    )
+    tse_rows = (
+        TudorAgent.query
+        .filter_by(report_id=latest.id)
+        .with_entities(
+            TudorAgent.tse,
+            func.count(TudorAgent.id),
+            func.sum(case((TudorAgent.ama_1plus == "YES", 1), else_=0)),
+        )
+        .group_by(TudorAgent.tse)
+        .order_by(desc(func.count(TudorAgent.id)))
+        .limit(10)
+        .all()
+    )
+
+    return {
+        "latest": latest,
+        "reports": reports,
+        "agents": agents,
+        "site_breakdown": [
+            {"site": row[0] or "Unknown", "total": row[1], "active": int(row[2] or 0)}
+            for row in site_rows
+        ],
+        "tse_breakdown": [
+            {"tse": row[0] or "Unassigned", "total": row[1], "ama": int(row[2] or 0)}
+            for row in tse_rows
+        ],
+        "search": search,
+        "status": status,
+    }

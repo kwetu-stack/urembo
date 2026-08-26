@@ -1,9 +1,10 @@
 from functools import wraps
 
-from flask import Blueprint, current_app, jsonify, redirect, render_template, session, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
 
 from config import Config
 from services.analytics import (
+    get_agents_page,
     get_dashboard_data,
     get_partner_performance_page,
     get_sim_utilization_page,
@@ -43,6 +44,17 @@ def sim_utilization():
 def partner_performance():
     data = get_partner_performance_page()
     return render_template("partner_performance.html", **data)
+
+
+@dashboard_bp.route("/agents")
+@login_required
+def agents():
+    data = get_agents_page(
+        search=request.args.get("q", "").strip() or None,
+        status=request.args.get("status", "").strip() or None,
+        page=request.args.get("page", 1, type=int),
+    )
+    return render_template("agents.html", **data)
 
 
 @dashboard_bp.route("/api/dashboard")

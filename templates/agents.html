@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Agents · UREMBO{% endblock %}
+
+{% block content %}
+<header class="page-header">
+  <div>
+    <h1>Tudor Agents</h1>
+    <p>Agent roster, activity status, and TSE coverage from the latest synced report</p>
+  </div>
+</header>
+
+{% if latest %}
+<section class="stats-grid">
+  <article class="stat-card highlight">
+    <span class="label">Active Agents</span>
+    <strong>{{ latest.active_agents }}</strong>
+    <small>of {{ latest.total_agents }} in the roster</small>
+  </article>
+  <article class="stat-card">
+    <span class="label">Inactive Agents</span>
+    <strong>{{ latest.total_agents - latest.active_agents }}</strong>
+  </article>
+  <article class="stat-card">
+    <span class="label">AMA 1+</span>
+    <strong>{{ latest.ama_1plus_count }}</strong>
+    <small>at least one activation</small>
+  </article>
+  <article class="stat-card">
+    <span class="label">QAMA</span>
+    <strong>{{ latest.qama_count }}</strong>
+    <small>report of {{ latest.report_date or latest.created_at.date() }}</small>
+  </article>
+</section>
+
+<section class="grid-2">
+  <article class="panel">
+    <h2>Top Sites</h2>
+    <table>
+      <thead><tr><th>Site</th><th>Agents</th><th>Active</th></tr></thead>
+      <tbody>
+        {% for row in site_breakdown %}
+        <tr><td>{{ row.site }}</td><td>{{ row.total }}</td><td>{{ row.active }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  <article class="panel">
+    <h2>TSE Coverage</h2>
+    <table>
+      <thead><tr><th>TSE</th><th>Agents</th><th>AMA 1+</th></tr></thead>
+      <tbody>
+        {% for row in tse_breakdown %}
+        <tr><td>{{ row.tse }}</td><td>{{ row.total }}</td><td>{{ row.ama }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>Agent Roster</h2>
+  <form class="filter-bar" method="get" action="{{ url_for('dashboard.agents') }}">
+    <input type="search" name="q" value="{{ search or '' }}" placeholder="Search agent, ID, site or TSE">
+    <select name="status">
+      <option value="">All statuses</option>
+      <option value="Active" {% if status and status|lower == 'active' %}selected{% endif %}>Active</option>
+      <option value="Inactive" {% if status and status|lower == 'inactive' %}selected{% endif %}>Inactive</option>
+    </select>
+    <button type="submit" class="btn btn-primary">Filter</button>
+    {% if search or status %}
+    <a class="btn btn-ghost" href="{{ url_for('dashboard.agents') }}">Clear</a>
+    {% endif %}
+  </form>
+
+  {% if agents and agents.items %}
+  <table>
+    <thead>
+      <tr><th>Agent</th><th>ID</th><th>Site</th><th>TSE</th><th>AMA 1+</th><th>QAMA</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      {% for agent in agents.items %}
+      <tr>
+        <td>{{ agent.agent_name or '—' }}</td>
+        <td>{{ agent.agent_id }}</td>
+        <td>{{ agent.site or '—' }}</td>
+        <td>{{ agent.tse or '—' }}</td>
+        <td>{% if agent.ama_1plus == 'YES' %}<span class="pill success">YES</span>{% else %}—{% endif %}</td>
+        <td>{% if agent.qama == 'YES' %}<span class="pill success">YES</span>{% else %}—{% endif %}</td>
+        <td>{% if agent.agent_status and agent.agent_status|lower == 'active' %}<span class="pill success">Active</span>{% else %}<span class="pill muted">{{ agent.agent_status or 'Unknown' }}</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="pagination">
+    <span>{{ agents.total }} agents · page {{ agents.page }} of {{ agents.pages }}</span>
+    <span class="pagination-links">
+      {% if agents.has_prev %}
+      <a class="btn btn-ghost" href="{{ url_for('dashboard.agents', q=search, status=status, page=agents.prev_num) }}">Previous</a>
+      {% endif %}
+      {% if agents.has_next %}
+      <a class="btn btn-ghost" href="{{ url_for('dashboard.agents', q=search, status=status, page=agents.next_num) }}">Next</a>
+      {% endif %}
+    </span>
+  </div>
+  {% else %}
+  <p class="empty">No agents match this filter.</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Report History</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Total</th><th>Active</th><th>AMA 1+</th><th>QAMA</th></tr></thead>
+    <tbody>
+      {% for report in reports %}
+      <tr>
+        <td>{{ report.report_date or report.created_at.date() }}</td>
+        <td>{{ report.total_agents }}</td>
+        <td>{{ report.active_agents }}</td>
+        <td>{{ report.ama_1plus_count }}</td>
+        <td>{{ report.qama_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% else %}
+<section class="panel empty-state">
+  <h2>No agent reports yet</h2>
+  <p>Tudor agent workbooks synced from Gmail will appear here.</p>
+</section>
+{% endif %}
+{% endblock %}
