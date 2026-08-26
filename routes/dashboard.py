@@ -1,8 +1,19 @@
 from functools import wraps
 
-from flask import Blueprint, current_app, jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from config import Config
+from extensions import db
 from models import (
     PartnerPerformanceReport,
     SimUtilizationReport,
@@ -19,6 +30,7 @@ from services.analytics import (
 )
 from services.sync_service import (
     GMAIL_QUERY,
+    ingest_tudor_upload,
     inspect_attachment_messages,
     inspect_tudor_messages,
     sync_gmail_reports,
@@ -67,6 +79,30 @@ def agents():
         page=request.args.get("page", 1, type=int),
     )
     return render_template("agents.html", **data)
+
+
+@dashboard_bp.route("/agents/upload", methods=["POST"])
+@login_required
+def upload_agents():
+    upload = request.files.get("workbook")
+    if not upload or not upload.filename:
+        flash("Choose a Tudor agents Excel file to upload.", "error")
+        return redirect(url_for("dashboard.agents"))
+
+    if not upload.filename.lower().endswith((".xlsx", ".xls")):
+        flash("That file is not an Excel workbook (.xlsx or .xls).", "error")
+        return redirect(url_for("dashboard.agents"))
+
+    try:
+        parsed = ingest_tudor_upload(upload.read(), upload.filename)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Tudor upload failed for %s", upload.filename)
+        flash("Could not read that workbook. Check it is the Tudor agents report.", "error")
+        return redirect(url_for("dashboard.agents"))
+
+    flash(f"Loaded {parsed['total_agents']} agents from {upload.filename}.", "success")
+    return redirect(url_for("dashboard.agents"))
 
 
 @dashboard_bp.route("/api/dashboard")

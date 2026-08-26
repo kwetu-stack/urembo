@@ -2,6 +2,7 @@ import base64
 import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from uuid import uuid4
 
 from flask import current_app
 from googleapiclient.discovery import build
@@ -27,6 +28,7 @@ from services.token_store import load_credentials
 
 GMAIL_QUERY = (
     'from:airtel.com OR from:ke.airtel.com OR from:kwetupartners.net OR '
+    f'from:{Config.ALLOWED_USER_EMAIL} OR '
     'subject:"PARTNER PERFORMANCE" OR subject:"SIM Insuance" OR '
     'subject:"SIM Issuance" OR subject:"TUDOR AGENTS" OR '
     'subject:TUDOR OR filename:TUDOR'
@@ -138,6 +140,8 @@ def _classify_message(subject, filenames):
 
 def _sender_allowed(sender):
     sender = (sender or "").lower()
+    if any(email in sender for email in Config.ALLOWED_SENDER_EMAILS):
+        return True
     return any(domain in sender for domain in Config.AIRTEL_SENDER_DOMAINS)
 
 
@@ -215,6 +219,26 @@ def _save_tudor_report(synced_email, parsed):
             qdrso=agent.get("qdrso"),
             agent_status=agent.get("agent_status"),
         ))
+
+
+def ingest_tudor_upload(file_bytes, filename, uploaded_by="manual-upload"):
+    """Store a Tudor workbook uploaded through the UI as if it had arrived by email."""
+    parsed = parse_tudor_agents_excel(file_bytes, filename, utcnow())
+    if not parsed["agents"]:
+        raise ValueError("No agent rows found in the workbook")
+
+    synced_email = SyncedEmail(
+        message_id=f"upload-{uuid4()}",
+        subject=filename,
+        sender=uploaded_by,
+        received_at=utcnow(),
+        report_type="tudor_agents",
+    )
+    db.session.add(synced_email)
+    db.session.flush()
+    _save_tudor_report(synced_email, parsed)
+    db.session.commit()
+    return parsed
 
 
 def process_message(service, message):

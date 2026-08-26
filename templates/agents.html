@@ -7,6 +7,10 @@
     <h1>Tudor Agents</h1>
     <p>Agent roster, activity status, and TSE coverage from the latest synced report</p>
   </div>
+  <form class="upload-form" method="post" action="{{ url_for('dashboard.upload_agents') }}" enctype="multipart/form-data">
+    <input type="file" name="workbook" accept=".xlsx,.xls" required>
+    <button type="submit" class="btn btn-primary">Upload report</button>
+  </form>
 </header>
 
 {% if latest %}
@@ -128,7 +132,8 @@
 {% else %}
 <section class="panel empty-state">
   <h2>No agent reports yet</h2>
-  <p>Tudor agent workbooks synced from Gmail will appear here. Click <strong>Sync Now</strong> to pull them; if the page stays empty, open <a href="{{ url_for('dashboard.api_diagnostics') }}">/api/diagnostics</a> to see which Tudor emails the sync found.</p>
+  <p>Tudor agent workbooks arrive two ways: email them to this Gmail account (forwarding them yourself works) and click <strong>Sync Now</strong>, or upload the Excel file directly with the button above.</p>
+  <p class="hint">Nothing showing after a sync? <a href="{{ url_for('dashboard.api_diagnostics') }}">/api/diagnostics</a> lists which emails the sync found.</p>
 </section>
 {% endif %}
 {% endblock %}
