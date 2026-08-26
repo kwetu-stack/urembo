@@ -17,7 +17,12 @@ from services.analytics import (
     get_sim_utilization_page,
     get_tudor_summary,
 )
-from services.sync_service import GMAIL_QUERY, inspect_tudor_messages, sync_gmail_reports
+from services.sync_service import (
+    GMAIL_QUERY,
+    inspect_attachment_messages,
+    inspect_tudor_messages,
+    sync_gmail_reports,
+)
 from services.token_store import has_connected_account
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -85,11 +90,17 @@ def api_dashboard():
 def api_diagnostics():
     """What sync has stored, and how Tudor-looking mail in the inbox would be classified."""
     synced = SyncedEmail.query.order_by(SyncedEmail.received_at.desc()).limit(25).all()
-    try:
-        tudor_scan = inspect_tudor_messages(current_app._get_current_object())
-    except Exception:
-        current_app.logger.exception("Tudor inbox scan failed")
-        tudor_scan = {"error": "Inbox scan failed", "messages": []}
+    app = current_app._get_current_object()
+
+    def scan(label, fn):
+        try:
+            return fn(app)
+        except Exception:
+            current_app.logger.exception("%s scan failed", label)
+            return {"error": f"{label} scan failed", "messages": []}
+
+    tudor_scan = scan("Tudor inbox", inspect_tudor_messages)
+    attachment_scan = scan("Attachment", inspect_attachment_messages)
     return jsonify({
         "gmail_query": GMAIL_QUERY,
         "allowed_sender_domains": Config.AIRTEL_SENDER_DOMAINS,
@@ -110,6 +121,7 @@ def api_diagnostics():
             for email in synced
         ],
         "tudor_inbox_scan": tudor_scan,
+        "attachment_scan": attachment_scan,
     })
 
 
