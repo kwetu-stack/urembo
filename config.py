@@ -30,3 +30,8 @@ class Config:
     ALLOWED_USER_EMAIL = os.getenv("ALLOWED_USER_EMAIL", "joycegachoki74@gmail.com").lower()
 
     AIRTEL_SENDER_DOMAINS = ("ke.airtel.com", "airtel.com", "kwetupartners.net")
+
+    # Reports the operator forwards to herself are trusted too.
+    ALLOWED_SENDER_EMAILS = (ALLOWED_USER_EMAIL,)
+
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_UPLOAD_MB", "25")) * 1024 * 1024

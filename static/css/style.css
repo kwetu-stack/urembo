@@ -139,6 +139,21 @@ th { color: var(--muted); font-size: .85rem; }
 }
 .pagination-links { display: flex; gap: .5rem; }
 
+.upload-form {
+  display: flex; gap: .5rem; align-items: center; flex-wrap: wrap;
+}
+.upload-form input[type="file"] {
+  padding: .5rem; border: 1px dashed var(--border);
+  border-radius: 10px; font: inherit; background: #fff; max-width: 320px;
+}
+
+.flash {
+  padding: .85rem 1rem; border-radius: 10px; margin-bottom: 1rem;
+  border: 1px solid var(--border); background: #fff;
+}
+.flash-success { border-color: #86efac; background: #f0fdf4; color: #166534; }
+.flash-error { border-color: #fca5a5; background: #fef2f2; color: #991b1b; }
+
 @media (max-width: 768px) {
   .navbar { flex-direction: column; align-items: stretch; }
   .nav-actions { justify-content: stretch; }
