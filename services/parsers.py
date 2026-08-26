@@ -21,6 +21,33 @@ def _clean_number(value):
         return None
 
 
+def _clean_text(value):
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "nat", "none"}:
+        return None
+    return text
+
+
+def _clean_identifier(value):
+    """Clean an ID-like cell, dropping the trailing '.0' pandas adds to numeric columns."""
+    text = _clean_text(value)
+    if text and re.fullmatch(r"\d+\.0+", text):
+        return text.split(".")[0]
+    return text
+
+
+def _clean_datetime(value):
+    parsed = pd.to_datetime(value, errors="coerce")
+    if pd.isna(parsed):
+        return None
+    parsed = parsed.to_pydatetime()
+    if parsed.tzinfo is not None:
+        parsed = parsed.replace(tzinfo=None)
+    return parsed
+
+
 def _parse_report_date(subject, fallback=None):
     subject = subject or ""
     patterns = [
@@ -123,27 +150,26 @@ def parse_sim_utilization_excel(file_bytes, subject, received_at=None):
 
     records = []
     for _, row in df.iterrows():
-        activation = row.get("activation_time")
         records.append({
-            "item_serial_number": str(row.get("item_serial_number", "")).strip(),
-            "distributor_name": str(row.get("distributorname", "")).strip(),
-            "order_date": pd.to_datetime(row.get("orderdate"), errors="coerce"),
-            "kyc_msisdn": str(row.get("kyc_msisdn", "")).strip(),
-            "served_msisdn": str(row.get("servedmsisdn", "")).strip(),
-            "kyc_created_on": pd.to_datetime(row.get("kyc_createdon"), errors="coerce"),
-            "activation_time": pd.to_datetime(activation, errors="coerce"),
-            "device_technology": str(row.get("devicetechnology", "")).strip(),
+            "item_serial_number": _clean_text(row.get("item_serial_number")),
+            "distributor_name": _clean_text(row.get("distributorname")),
+            "order_date": _clean_datetime(row.get("orderdate")),
+            "kyc_msisdn": _clean_identifier(row.get("kyc_msisdn")),
+            "served_msisdn": _clean_identifier(row.get("servedmsisdn")),
+            "kyc_created_on": _clean_datetime(row.get("kyc_createdon")),
+            "activation_time": _clean_datetime(row.get("activation_time")),
+            "device_technology": _clean_text(row.get("devicetechnology")),
             "recharge_amount": _clean_number(row.get("rechargeamount")),
-            "retailer_msisdn": str(row.get("retailer_msisdn", "")).strip(),
-            "zone_name": str(row.get("zone_name", "")).strip(),
+            "retailer_msisdn": _clean_identifier(row.get("retailer_msisdn")),
+            "zone_name": _clean_text(row.get("zone_name")),
         })
 
     total = len(records)
-    activated = sum(1 for r in records if pd.notna(r["activation_time"]))
+    activated = sum(1 for r in records if r["activation_time"] is not None)
     utilization = round((activated / total) * 100, 2) if total else 0.0
 
-    dso_id = str(df.iloc[0].get("dsoid", "")) if not df.empty else None
-    distributor = str(df.iloc[0].get("distributorname", "")) if not df.empty else None
+    dso_id = _clean_identifier(df.iloc[0].get("dsoid")) if not df.empty else None
+    distributor = _clean_text(df.iloc[0].get("distributorname")) if not df.empty else None
 
     return {
         "report_date": _parse_report_date(subject, received_at),
@@ -162,21 +188,24 @@ def parse_tudor_agents_excel(file_bytes, subject, received_at=None):
 
     agents = []
     for _, row in df.iterrows():
-        agent_id = str(row.get("AGENT", "")).strip()
-        if not agent_id or agent_id.lower() == "nan":
+        agent_id = _clean_identifier(row.get("AGENT"))
+        if not agent_id:
             continue
+        ama = _clean_text(row.get("AMA 1+"))
+        qama_value = _clean_text(row.get("QAMA"))
+        qdrso = _clean_text(row.get("QDRSO"))
         agents.append({
             "agent_id": agent_id,
-            "agent_name": str(row.get("AGENT NAME", "")).strip(),
-            "site": str(row.get("SITE", "")).strip(),
-            "tse": str(row.get("TSE", "")).strip(),
-            "ama_1plus": str(row.get("AMA 1+", "")).strip().upper(),
-            "qama": str(row.get("QAMA", "")).strip().upper(),
-            "qdrso": str(row.get("QDRSO", "")).strip().upper(),
-            "agent_status": str(row.get("AGENT STATUS", "")).strip(),
+            "agent_name": _clean_text(row.get("AGENT NAME")),
+            "site": _clean_text(row.get("SITE")),
+            "tse": _clean_text(row.get("TSE")),
+            "ama_1plus": ama.upper() if ama else None,
+            "qama": qama_value.upper() if qama_value else None,
+            "qdrso": qdrso.upper() if qdrso else None,
+            "agent_status": _clean_text(row.get("AGENT STATUS")),
         })
 
-    active = sum(1 for a in agents if a["agent_status"].lower() == "active")
+    active = sum(1 for a in agents if (a["agent_status"] or "").lower() == "active")
     ama = sum(1 for a in agents if a["ama_1plus"] == "YES")
     qama = sum(1 for a in agents if a["qama"] == "YES")
 
