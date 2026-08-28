@@ -313,3 +313,106 @@ def parse_tudor_agents_excel(file_bytes, subject, received_at=None):
         "qama_count": qama_count,
         "agents": agents,
     }
+
+
+def parse_tudor_agents_html(html, subject, received_at=None):
+    """Parse Tudor agent data from HTML email content."""
+    soup = BeautifulSoup(html or "", "html.parser")
+    text = soup.get_text("\n", strip=True)
+
+    # Try to extract agent data from HTML tables
+    agents = []
+    for table in soup.find_all("table"):
+        for row in table.find_all("tr")[1:]:  # Skip header row
+            cells = row.find_all(["td", "th"])
+            if len(cells) >= 2:
+                # Try to identify agent data in cells
+                cells_text = [cell.get_text(" ", strip=True) for cell in cells]
+
+                # Try to map cells to known columns based on content patterns
+                agent_id = None
+                agent_name = None
+                site = None
+                tse = None
+                ama_1plus = None
+                qama = None
+                qdrso = None
+                agent_status = None
+
+                for i, cell_text in enumerate(cells_text):
+                    if cell_text:
+                        # Check if this looks like an agent ID (numeric)
+                        if cell_text.isdigit() and len(cell_text) >= 4:
+                            agent_id = cell_text
+                        # Check if this looks like a name (contains letters)
+                        elif any(c.isalpha() for c in cell_text) and len(cell_text) > 2:
+                            if not agent_name:
+                                agent_name = cell_text
+                            elif not site:
+                                site = cell_text
+                            elif not tse:
+                                tse = cell_text
+                        # Check for YES/NO values
+                        elif cell_text.upper() in ["YES", "NO"]:
+                            if not ama_1plus:
+                                ama_1plus = cell_text.upper()
+                            elif not qama:
+                                qama = cell_text.upper()
+                            elif not qdrso:
+                                qdrso = cell_text.upper()
+                        # Check for status
+                        elif cell_text.lower() in ["active", "inactive"]:
+                            agent_status = cell_text
+
+                if agent_id or agent_name:
+                    agents.append(
+                        {
+                            "agent_id": agent_id,
+                            "agent_name": agent_name,
+                            "site": site,
+                            "tse": tse,
+                            "ama_1plus": ama_1plus,
+                            "qama": qama,
+                            "qdrso": qdrso,
+                            "agent_status": agent_status,
+                        }
+                    )
+
+    # If no table data found, try parsing from text
+    if not agents:
+        # Try to find agent data in text format
+        lines = text.split("\n")
+        for line in lines:
+            if line.strip():
+                # Look for patterns that might contain agent information
+                parts = line.split()
+                if len(parts) >= 2 and parts[0].isdigit():
+                    agents.append(
+                        {
+                            "agent_id": parts[0],
+                            "agent_name": (
+                                " ".join(parts[1:3]) if len(parts) > 2 else parts[1]
+                            ),
+                            "site": None,
+                            "tse": None,
+                            "ama_1plus": None,
+                            "qama": None,
+                            "qdrso": None,
+                            "agent_status": None,
+                        }
+                    )
+
+    active = sum(1 for a in agents if (a["agent_status"] or "").lower() == "active")
+    ama_count = sum(1 for a in agents if a["ama_1plus"] == "YES")
+    qama_count = sum(1 for a in agents if a["qama"] == "YES")
+
+    print(f"Parsed {len(agents)} Tudor agents from HTML")
+
+    return {
+        "report_date": _parse_report_date(subject, received_at),
+        "total_agents": len(agents),
+        "active_agents": active,
+        "ama_1plus_count": ama_count,
+        "qama_count": qama_count,
+        "agents": agents,
+    }

@@ -21,6 +21,7 @@ from services.parsers import (
     parse_partner_performance_html,
     parse_sim_utilization_excel,
     parse_tudor_agents_excel,
+    parse_tudor_agents_html,
 )
 from services.token_store import load_credentials
 
@@ -286,6 +287,10 @@ def process_message(service, message):
             pass
 
     html, text, attachment_parts = _extract_parts(full["payload"])
+
+    # Store these for use in processing
+    email_html = html
+    email_text = text
     filenames = [p.get("filename", "") for p in attachment_parts]
     report_type = _classify_message(subject, filenames)
     if not report_type:
@@ -302,7 +307,9 @@ def process_message(service, message):
     db.session.flush()
 
     if report_type == "partner_performance":
-        parsed = parse_partner_performance_html(html or text, subject, received_at)
+        parsed = parse_partner_performance_html(
+            email_html or email_text, subject, received_at
+        )
         _save_partner_report(synced_email, parsed)
     elif report_type == "sim_utilization":
         excel_part = next(
@@ -320,14 +327,29 @@ def process_message(service, message):
         parsed = parse_sim_utilization_excel(file_bytes, subject, received_at)
         _save_sim_report(synced_email, parsed)
     elif report_type == "tudor_agents":
-        excel_part = attachment_parts[0] if attachment_parts else None
-        if not excel_part:
-            print(f"No attachment found for Tudor email: {subject}")
-            db.session.rollback()
-            return False
-        print(f"Processing Tudor attachment: {excel_part.get('filename', 'unknown')}")
-        file_bytes = _download_attachment(service, message_id, excel_part)
-        parsed = parse_tudor_agents_excel(file_bytes, subject, received_at)
+        # Try to find Excel attachment first
+        excel_part = None
+        for part in attachment_parts:
+            filename = part.get("filename", "").lower()
+            if filename.endswith((".xlsx", ".xls")):
+                excel_part = part
+                break
+
+        if excel_part:
+            print(
+                f"Processing Tudor Excel attachment: {excel_part.get('filename', 'unknown')}"
+            )
+            file_bytes = _download_attachment(service, message_id, excel_part)
+            parsed = parse_tudor_agents_excel(file_bytes, subject, received_at)
+        else:
+            # No Excel attachment, try HTML parsing
+            print(
+                f"No Excel attachment found, trying HTML parsing for Tudor email: {subject}"
+            )
+            parsed = parse_tudor_agents_html(
+                email_html or email_text, subject, received_at
+            )
+
         print(
             f"Parsed Tudor data: {parsed.get('total_agents')} agents, {parsed.get('active_agents')} active"
         )
