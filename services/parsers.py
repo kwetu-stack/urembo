@@ -54,6 +54,7 @@ def _parse_report_date(subject, fallback=None):
         r"AS AT (\d{1,2})(?:ST|ND|RD|TH)?\s+([A-Z]+)\s+(\d{4})",
         r"AS OF[_\s-]*(\d{2})-(\d{2})-(\d{4})",
         r"(\d{2})-(\d{2})-(\d{4})",
+        r"(\d{1,2})/(\d{1,2})/(\d{4})",  # MM/DD/YYYY or DD/MM/YYYY
     ]
     months = {
         "JANUARY": 1,
@@ -70,6 +71,8 @@ def _parse_report_date(subject, fallback=None):
         "DECEMBER": 12,
     }
     upper = subject.upper()
+
+    # Try month name pattern first
     match = re.search(patterns[0], upper)
     if match:
         day, month_name, year = match.groups()
@@ -77,13 +80,40 @@ def _parse_report_date(subject, fallback=None):
         if not month and month_name in months:
             month = months[month_name]
         if month:
-            return datetime(int(year), month, int(day)).date()
+            try:
+                return datetime(int(year), month, int(day)).date()
+            except (ValueError, TypeError) as e:
+                print(
+                    f"Date parsing error with month pattern: {e}, day={day}, month={month}, year={year}"
+                )
+                pass  # Invalid date, try next pattern
 
+    # Try date patterns with better error handling
     for pattern in patterns[1:]:
         match = re.search(pattern, subject)
         if match:
-            d, m, y = match.groups()
-            return datetime(int(y), int(m), int(d)).date()
+            groups = match.groups()
+            try:
+                if len(groups) == 3:
+                    d, m, y = groups
+                    # Validate ranges before creating datetime
+                    d, m, y = int(d), int(m), int(y)
+                    if not (1 <= m <= 12 and 1 <= d <= 31 and 2000 <= y <= 2100):
+                        continue
+                    # Try both DD-MM-YYYY and MM-DD-YYYY formats
+                    try:
+                        return datetime(y, m, d).date()
+                    except ValueError:
+                        # Try swapping day and month
+                        try:
+                            return datetime(y, d, m).date()
+                        except ValueError:
+                            continue
+            except (ValueError, TypeError) as e:
+                print(
+                    f"Date parsing error with pattern {pattern}: {e}, groups={groups}"
+                )
+                continue  # Invalid date, try next pattern
 
     return fallback.date() if fallback else None
 
