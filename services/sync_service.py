@@ -287,10 +287,6 @@ def process_message(service, message):
             pass
 
     html, text, attachment_parts = _extract_parts(full["payload"])
-
-    # Store these for use in processing
-    email_html = html
-    email_text = text
     filenames = [p.get("filename", "") for p in attachment_parts]
     report_type = _classify_message(subject, filenames)
     if not report_type:
@@ -307,9 +303,7 @@ def process_message(service, message):
     db.session.flush()
 
     if report_type == "partner_performance":
-        parsed = parse_partner_performance_html(
-            email_html or email_text, subject, received_at
-        )
+        parsed = parse_partner_performance_html(html or text, subject, received_at)
         _save_partner_report(synced_email, parsed)
     elif report_type == "sim_utilization":
         excel_part = next(
@@ -346,9 +340,7 @@ def process_message(service, message):
             print(
                 f"No Excel attachment found, trying HTML parsing for Tudor email: {subject}"
             )
-            parsed = parse_tudor_agents_html(
-                email_html or email_text, subject, received_at
-            )
+            parsed = parse_tudor_agents_html(html or text, subject, received_at)
 
         print(
             f"Parsed Tudor data: {parsed.get('total_agents')} agents, {parsed.get('active_agents')} active"
