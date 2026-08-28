@@ -31,14 +31,15 @@ def _build_gmail_query():
         f"({senders}) AND ("
         'subject:"PARTNER PERFORMANCE" OR subject:"SIM Insuance" OR '
         'subject:"SIM Issuance" OR subject:"TUDOR AGENTS" OR '
-        "subject:TUDOR OR filename:TUDOR)"
+        "subject:TUDOR OR filename:TUDOR OR subject:AGENT OR filename:AGENT OR "
+        'subject:"AGENT" OR has:attachment)'
     )
 
 
 GMAIL_QUERY = _build_gmail_query()
 
 
-TUDOR_QUERY = "subject:TUDOR OR filename:TUDOR OR subject:AGENT"
+TUDOR_QUERY = "subject:TUDOR OR filename:TUDOR OR subject:AGENT OR filename:AGENT OR subject:AGENT OR has:attachment"
 
 ATTACHMENT_QUERY = "has:attachment (filename:xlsx OR filename:xls OR filename:csv)"
 
@@ -140,12 +141,17 @@ def _classify_message(subject, filenames):
         or "ISSUANCE" in names_upper
     ):
         return "sim_utilization"
-    if "TUDOR" in names_upper and "AGENT" in names_upper:
-        return "tudor_agents"
     if "SIM" in subject_upper:
         return "sim_utilization"
-    if "TUDOR" in subject_upper:
+    # More flexible Tudor agent detection
+    if "TUDOR" in subject_upper or "TUDOR" in names_upper:
         return "tudor_agents"
+    if "AGENT" in names_upper:
+        return "tudor_agents"
+    # If it has an Excel attachment and doesn't match other types, try Tudor
+    if any(fname.endswith((".xlsx", ".xls")) for fname in filenames):
+        if not ("SIM" in subject_upper or "SIM" in names_upper):
+            return "tudor_agents"
     return None
 
 
