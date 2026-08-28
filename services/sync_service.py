@@ -23,11 +23,10 @@ from services.parsers import (
 )
 from services.token_store import load_credentials
 
-
 GMAIL_QUERY = (
-    'from:airtel.com OR from:ke.airtel.com OR from:kwetupartners.net OR '
+    "from:a_lamek.omullo@ke.airtel.com AND ("
     'subject:"PARTNER PERFORMANCE" OR subject:"SIM Insuance" OR '
-    'subject:"SIM Issuance" OR subject:"TUDOR AGENTS"'
+    'subject:"SIM Issuance" OR subject:"TUDOR AGENTS")'
 )
 
 
@@ -90,9 +89,13 @@ def _extract_parts(payload):
 
 def _download_attachment(service, message_id, part):
     attachment_id = part["body"]["attachmentId"]
-    attachment = service.users().messages().attachments().get(
-        userId="me", messageId=message_id, id=attachment_id
-    ).execute()
+    attachment = (
+        service.users()
+        .messages()
+        .attachments()
+        .get(userId="me", messageId=message_id, id=attachment_id)
+        .execute()
+    )
     return base64.urlsafe_b64decode(attachment["data"])
 
 
@@ -102,7 +105,11 @@ def _classify_message(subject, filenames):
 
     if "PARTNER PERFORMANCE" in subject_upper:
         return "partner_performance"
-    if "SIM" in names_upper and ("UTILIZATION" in names_upper or "INSUANCE" in names_upper or "ISSUANCE" in names_upper):
+    if "SIM" in names_upper and (
+        "UTILIZATION" in names_upper
+        or "INSUANCE" in names_upper
+        or "ISSUANCE" in names_upper
+    ):
         return "sim_utilization"
     if "TUDOR" in names_upper and "AGENT" in names_upper:
         return "tudor_agents"
@@ -115,7 +122,9 @@ def _classify_message(subject, filenames):
 
 def _sender_allowed(sender):
     sender = (sender or "").lower()
-    return any(domain in sender for domain in Config.AIRTEL_SENDER_DOMAINS)
+    # Only accept emails from the specific sender
+    allowed_sender = "a_lamek.omullo@ke.airtel.com"
+    return allowed_sender in sender
 
 
 def _save_partner_report(synced_email, parsed):
@@ -152,20 +161,22 @@ def _save_sim_report(synced_email, parsed):
     db.session.flush()
 
     for record in parsed.get("records", []):
-        db.session.add(SimUtilizationRecord(
-            report_id=report.id,
-            item_serial_number=record.get("item_serial_number"),
-            distributor_name=record.get("distributor_name"),
-            order_date=_naive(record.get("order_date")),
-            kyc_msisdn=record.get("kyc_msisdn"),
-            served_msisdn=record.get("served_msisdn"),
-            kyc_created_on=_naive(record.get("kyc_created_on")),
-            activation_time=_naive(record.get("activation_time")),
-            device_technology=record.get("device_technology"),
-            recharge_amount=record.get("recharge_amount"),
-            retailer_msisdn=record.get("retailer_msisdn"),
-            zone_name=record.get("zone_name"),
-        ))
+        db.session.add(
+            SimUtilizationRecord(
+                report_id=report.id,
+                item_serial_number=record.get("item_serial_number"),
+                distributor_name=record.get("distributor_name"),
+                order_date=_naive(record.get("order_date")),
+                kyc_msisdn=record.get("kyc_msisdn"),
+                served_msisdn=record.get("served_msisdn"),
+                kyc_created_on=_naive(record.get("kyc_created_on")),
+                activation_time=_naive(record.get("activation_time")),
+                device_technology=record.get("device_technology"),
+                recharge_amount=record.get("recharge_amount"),
+                retailer_msisdn=record.get("retailer_msisdn"),
+                zone_name=record.get("zone_name"),
+            )
+        )
 
 
 def _save_tudor_report(synced_email, parsed):
@@ -181,17 +192,19 @@ def _save_tudor_report(synced_email, parsed):
     db.session.flush()
 
     for agent in parsed.get("agents", []):
-        db.session.add(TudorAgent(
-            report_id=report.id,
-            agent_id=agent.get("agent_id"),
-            agent_name=agent.get("agent_name"),
-            site=agent.get("site"),
-            tse=agent.get("tse"),
-            ama_1plus=agent.get("ama_1plus"),
-            qama=agent.get("qama"),
-            qdrso=agent.get("qdrso"),
-            agent_status=agent.get("agent_status"),
-        ))
+        db.session.add(
+            TudorAgent(
+                report_id=report.id,
+                agent_id=agent.get("agent_id"),
+                agent_name=agent.get("agent_name"),
+                site=agent.get("site"),
+                tse=agent.get("tse"),
+                ama_1plus=agent.get("ama_1plus"),
+                qama=agent.get("qama"),
+                qdrso=agent.get("qdrso"),
+                agent_status=agent.get("agent_status"),
+            )
+        )
 
 
 def process_message(service, message):
@@ -199,12 +212,24 @@ def process_message(service, message):
     if SyncedEmail.query.filter_by(message_id=message_id).first():
         return False
 
-    full = service.users().messages().get(userId="me", id=message_id, format="full").execute()
-    headers = {h["name"].lower(): h["value"] for h in full["payload"].get("headers", [])}
+    full = (
+        service.users()
+        .messages()
+        .get(userId="me", id=message_id, format="full")
+        .execute()
+    )
+    headers = {
+        h["name"].lower(): h["value"] for h in full["payload"].get("headers", [])
+    }
     subject = headers.get("subject", "")
     sender = headers.get("from", "")
 
     if not _sender_allowed(sender):
+        return False
+
+    # Exclude forwarded emails
+    subject_upper = (subject or "").upper()
+    if subject_upper.startswith("FWD:") or subject_upper.startswith("FW:"):
         return False
 
     received_at = utcnow()
@@ -237,7 +262,11 @@ def process_message(service, message):
         _save_partner_report(synced_email, parsed)
     elif report_type == "sim_utilization":
         excel_part = next(
-            (p for p in attachment_parts if re.search(r"sim", p.get("filename", ""), re.I)),
+            (
+                p
+                for p in attachment_parts
+                if re.search(r"sim", p.get("filename", ""), re.I)
+            ),
             attachment_parts[0] if attachment_parts else None,
         )
         if not excel_part:
@@ -268,12 +297,17 @@ def sync_gmail_reports(app):
         processed = 0
         page_token = None
         while True:
-            response = service.users().messages().list(
-                userId="me",
-                q=GMAIL_QUERY,
-                maxResults=50,
-                pageToken=page_token,
-            ).execute()
+            response = (
+                service.users()
+                .messages()
+                .list(
+                    userId="me",
+                    q=GMAIL_QUERY,
+                    maxResults=50,
+                    pageToken=page_token,
+                )
+                .execute()
+            )
 
             for message in response.get("messages", []):
                 if process_message(service, message):

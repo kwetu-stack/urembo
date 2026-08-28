@@ -21,6 +21,7 @@ def login_required(view):
         if not session.get("connected") or not has_connected_account():
             return redirect(url_for("auth.home"))
         return view(*args, **kwargs)
+
     return wrapped
 
 
@@ -45,26 +46,40 @@ def partner_performance():
     return render_template("partner_performance.html", **data)
 
 
+@dashboard_bp.route("/tudor-agents")
+@login_required
+def tudor_agents():
+    data = get_tudor_summary()
+    return render_template("tudor_agents.html", **data)
+
+
 @dashboard_bp.route("/api/dashboard")
 @login_required
 def api_dashboard():
     data = get_dashboard_data()
-    return jsonify({
-        "commission": data["partner"].projected_commission if data["partner"] else None,
-        "contract_status": data["partner"].contract_status if data["partner"] else None,
-        "sim_utilization": data["sim"].utilization_rate if data["sim"] else None,
-        "total_sims": data["sim"].total_sims if data["sim"] else None,
-        "active_agents": data["tudor"].active_agents if data["tudor"] else None,
-        "alerts": data["alerts"],
-        "commission_trend": data["commission_trend"],
-        "utilization_trend": data["utilization_trend"],
-    })
+    return jsonify(
+        {
+            "commission": (
+                data["partner"].projected_commission if data["partner"] else None
+            ),
+            "contract_status": (
+                data["partner"].contract_status if data["partner"] else None
+            ),
+            "sim_utilization": data["sim"].utilization_rate if data["sim"] else None,
+            "total_sims": data["sim"].total_sims if data["sim"] else None,
+            "active_agents": data["tudor"].active_agents if data["tudor"] else None,
+            "alerts": data["alerts"],
+            "commission_trend": data["commission_trend"],
+            "utilization_trend": data["utilization_trend"],
+        }
+    )
 
 
 @dashboard_bp.route("/api/sync", methods=["POST"])
 @login_required
 def api_sync():
     from flask import current_app
+
     try:
         result = sync_gmail_reports(current_app._get_current_object())
         return jsonify(result)

@@ -21,6 +21,7 @@
       <a href="{{ url_for('dashboard.dashboard') }}" class="{% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}">Dashboard</a>
       <a href="{{ url_for('dashboard.sim_utilization') }}" class="{% if request.endpoint == 'dashboard.sim_utilization' %}active{% endif %}">SIM Issuance</a>
       <a href="{{ url_for('dashboard.partner_performance') }}" class="{% if request.endpoint == 'dashboard.partner_performance' %}active{% endif %}">Partner Performance</a>
+      <a href="{{ url_for('dashboard.tudor_agents') }}" class="{% if request.endpoint == 'dashboard.tudor_agents' %}active{% endif %}">Tudor Agents</a>
     </div>
     <div class="nav-actions">
       <button id="sync-btn" class="btn btn-light">Sync Now</button>
