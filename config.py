@@ -36,4 +36,5 @@ class Config:
         "a_lamek.omullo@ke.airtel.com",
         "a_david.kemboi@ke.airtel.com",
         "a_rebecca.wanjiru@ke.airtel.com",
+        "a_dan.rotich@ke.airtel.com",
     )
