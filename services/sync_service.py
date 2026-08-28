@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
+from flask import current_app
 from googleapiclient.discovery import build
 
 from config import Config
@@ -26,15 +27,37 @@ from services.token_store import load_credentials
 GMAIL_QUERY = (
     "from:a_lamek.omullo@ke.airtel.com AND ("
     'subject:"PARTNER PERFORMANCE" OR subject:"SIM Insuance" OR '
-    'subject:"SIM Issuance" OR subject:"TUDOR AGENTS")'
+    'subject:"SIM Issuance" OR subject:"TUDOR AGENTS" OR '
+    "subject:TUDOR OR filename:TUDOR)"
 )
 
 
+TUDOR_QUERY = "subject:TUDOR OR filename:TUDOR OR subject:AGENT"
+
+ATTACHMENT_QUERY = "has:attachment (filename:xlsx OR filename:xls OR filename:csv)"
+
+REPORT_MODELS = {
+    "partner_performance": PartnerPerformanceReport,
+    "sim_utilization": SimUtilizationReport,
+    "tudor_agents": TudorAgentReport,
+}
+
+
+def _has_report(synced_email):
+    """True when the stored email already produced its report row."""
+    model = REPORT_MODELS.get(synced_email.report_type)
+    if not model:
+        return True
+    return model.query.filter_by(synced_email_id=synced_email.id).first() is not None
+
+
 def _naive(dt):
-    if dt is None:
+    if dt is None or dt != dt:
         return None
     if hasattr(dt, "to_pydatetime"):
         dt = dt.to_pydatetime()
+    if not isinstance(dt, datetime):
+        return None
     if dt.tzinfo is not None:
         return dt.replace(tzinfo=None)
     return dt
@@ -209,8 +232,14 @@ def _save_tudor_report(synced_email, parsed):
 
 def process_message(service, message):
     message_id = message["id"]
-    if SyncedEmail.query.filter_by(message_id=message_id).first():
-        return False
+    existing = SyncedEmail.query.filter_by(message_id=message_id).first()
+    if existing:
+        if _has_report(existing):
+            return False
+        # Email was recorded by an earlier run that failed before saving its report;
+        # drop the marker so the message is parsed again below.
+        db.session.delete(existing)
+        db.session.flush()
 
     full = (
         service.users()
@@ -292,9 +321,10 @@ def sync_gmail_reports(app):
     with app.app_context():
         service = get_gmail_service()
         if not service:
-            return {"processed": 0, "error": "No connected Gmail account"}
+            return {"processed": 0, "failed": 0, "error": "No connected Gmail account"}
 
         processed = 0
+        failed = 0
         page_token = None
         while True:
             response = (
@@ -310,11 +340,90 @@ def sync_gmail_reports(app):
             )
 
             for message in response.get("messages", []):
-                if process_message(service, message):
-                    processed += 1
+                try:
+                    if process_message(service, message):
+                        processed += 1
+                except Exception:
+                    db.session.rollback()
+                    failed += 1
+                    current_app.logger.exception(
+                        "Failed to process Gmail message %s", message.get("id")
+                    )
 
             page_token = response.get("nextPageToken")
             if not page_token:
                 break
 
-        return {"processed": processed, "error": None}
+        return {"processed": processed, "failed": failed, "error": None}
+
+
+def inspect_messages(app, query, limit=25):
+    """Report what Gmail returns for a query and how sync would classify each message."""
+    with app.app_context():
+        service = get_gmail_service()
+        if not service:
+            return {
+                "error": "No connected Gmail account",
+                "query": query,
+                "messages": [],
+            }
+
+        response = (
+            service.users()
+            .messages()
+            .list(userId="me", q=query, maxResults=limit)
+            .execute()
+        )
+
+        messages = []
+        for message in response.get("messages", []):
+            full = (
+                service.users()
+                .messages()
+                .get(userId="me", id=message["id"], format="full")
+                .execute()
+            )
+            headers = {
+                h["name"].lower(): h["value"]
+                for h in full["payload"].get("headers", [])
+            }
+            subject = headers.get("subject", "")
+            sender = headers.get("from", "")
+            _, _, attachment_parts = _extract_parts(full["payload"])
+            filenames = [p.get("filename", "") for p in attachment_parts]
+            synced = SyncedEmail.query.filter_by(message_id=message["id"]).first()
+            messages.append(
+                {
+                    "subject": subject,
+                    "sender": sender,
+                    "date": headers.get("date"),
+                    "filenames": filenames,
+                    "sender_allowed": _sender_allowed(sender),
+                    "classified_as": _classify_message(subject, filenames),
+                    "matches_sync_query": None,
+                    "already_synced": bool(synced),
+                    "has_report": _has_report(synced) if synced else False,
+                }
+            )
+
+        synced_ids = {
+            m["id"]
+            for m in service.users()
+            .messages()
+            .list(userId="me", q=GMAIL_QUERY, maxResults=500)
+            .execute()
+            .get("messages", [])
+        }
+        for entry, message in zip(messages, response.get("messages", [])):
+            entry["matches_sync_query"] = message["id"] in synced_ids
+
+        return {"error": None, "query": query, "messages": messages}
+
+
+def inspect_tudor_messages(app, limit=25):
+    return inspect_messages(app, TUDOR_QUERY, limit=limit)
+
+
+def inspect_attachment_messages(app, limit=40):
+    """Every recent spreadsheet attachment, to find reports the classifier is missing."""
+    return inspect_messages(app, ATTACHMENT_QUERY, limit=limit)

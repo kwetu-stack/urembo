@@ -1,15 +1,37 @@
 from functools import wraps
 
-from flask import Blueprint, jsonify, redirect, render_template, session, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from config import Config
+from models import (
+    PartnerPerformanceReport,
+    SimUtilizationReport,
+    SyncedEmail,
+    TudorAgent,
+    TudorAgentReport,
+)
 from services.analytics import (
+    get_agents_page,
     get_dashboard_data,
     get_partner_performance_page,
     get_sim_utilization_page,
     get_tudor_summary,
 )
-from services.sync_service import sync_gmail_reports
+from services.sync_service import (
+    GMAIL_QUERY,
+    inspect_attachment_messages,
+    inspect_tudor_messages,
+    sync_gmail_reports,
+)
 from services.token_store import has_connected_account
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -46,11 +68,15 @@ def partner_performance():
     return render_template("partner_performance.html", **data)
 
 
-@dashboard_bp.route("/tudor-agents")
+@dashboard_bp.route("/agents")
 @login_required
-def tudor_agents():
-    data = get_tudor_summary()
-    return render_template("tudor_agents.html", **data)
+def agents():
+    data = get_agents_page(
+        search=request.args.get("q", "").strip() or None,
+        status=request.args.get("status", "").strip() or None,
+        page=request.args.get("page", 1, type=int),
+    )
+    return render_template("agents.html", **data)
 
 
 @dashboard_bp.route("/api/dashboard")
@@ -75,13 +101,65 @@ def api_dashboard():
     )
 
 
+@dashboard_bp.route("/api/diagnostics")
+@login_required
+def api_diagnostics():
+    """What sync has stored, and how Tudor-looking mail in the inbox would be classified."""
+    synced = SyncedEmail.query.order_by(SyncedEmail.received_at.desc()).limit(25).all()
+    app = current_app._get_current_object()
+
+    def scan(label, fn):
+        try:
+            return fn(app)
+        except Exception:
+            current_app.logger.exception("%s scan failed", label)
+            return {"error": f"{label} scan failed", "messages": []}
+
+    tudor_scan = scan("Tudor inbox", inspect_tudor_messages)
+    attachment_scan = scan("Attachment", inspect_attachment_messages)
+    return jsonify(
+        {
+            "gmail_query": GMAIL_QUERY,
+            "allowed_sender_domains": Config.AIRTEL_SENDER_DOMAINS,
+            "counts": {
+                "synced_emails": SyncedEmail.query.count(),
+                "partner_performance_reports": PartnerPerformanceReport.query.count(),
+                "sim_utilization_reports": SimUtilizationReport.query.count(),
+                "tudor_agent_reports": TudorAgentReport.query.count(),
+                "tudor_agents": TudorAgent.query.count(),
+            },
+            "recent_synced_emails": [
+                {
+                    "subject": email.subject,
+                    "sender": email.sender,
+                    "received_at": (
+                        email.received_at.isoformat() if email.received_at else None
+                    ),
+                    "report_type": email.report_type,
+                }
+                for email in synced
+            ],
+            "tudor_inbox_scan": tudor_scan,
+            "attachment_scan": attachment_scan,
+        }
+    )
+
+
 @dashboard_bp.route("/api/sync", methods=["POST"])
 @login_required
 def api_sync():
-    from flask import current_app
-
     try:
         result = sync_gmail_reports(current_app._get_current_object())
         return jsonify(result)
-    except Exception as exc:
-        return jsonify({"processed": 0, "error": str(exc)}), 500
+    except Exception:
+        current_app.logger.exception("Gmail sync failed")
+        return (
+            jsonify(
+                {
+                    "processed": 0,
+                    "failed": 0,
+                    "error": "Sync failed. Please try again or contact support if it keeps happening.",
+                }
+            ),
+            500,
+        )
