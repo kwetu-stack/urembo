@@ -28,6 +28,7 @@ from services.analytics import (
 )
 from services.sync_service import (
     GMAIL_QUERY,
+    _build_gmail_query,
     inspect_attachment_messages,
     inspect_tudor_messages,
     sync_gmail_reports,
@@ -119,8 +120,9 @@ def api_diagnostics():
     attachment_scan = scan("Attachment", inspect_attachment_messages)
     return jsonify(
         {
-            "gmail_query": GMAIL_QUERY,
+            "gmail_query": _build_gmail_query(),
             "allowed_sender_domains": Config.AIRTEL_SENDER_DOMAINS,
+            "allowed_senders": Config.ALLOWED_SENDERS,
             "counts": {
                 "synced_emails": SyncedEmail.query.count(),
                 "partner_performance_reports": PartnerPerformanceReport.query.count(),

@@ -27,6 +27,13 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
 
     SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "60"))
-    ALLOWED_USER_EMAIL = os.getenv("ALLOWED_USER_EMAIL", "joycegachoki74@gmail.com").lower()
+    ALLOWED_USER_EMAIL = os.getenv(
+        "ALLOWED_USER_EMAIL", "joycegachoki74@gmail.com"
+    ).lower()
 
     AIRTEL_SENDER_DOMAINS = ("ke.airtel.com", "airtel.com", "kwetupartners.net")
+    ALLOWED_SENDERS = (
+        "a_lamek.omullo@ke.airtel.com",
+        "a_david.kemboi@ke.airtel.com",
+        "a_rebecca.wanjiru@ke.airtel.com",
+    )

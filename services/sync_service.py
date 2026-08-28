@@ -24,12 +24,18 @@ from services.parsers import (
 )
 from services.token_store import load_credentials
 
-GMAIL_QUERY = (
-    "from:a_lamek.omullo@ke.airtel.com AND ("
-    'subject:"PARTNER PERFORMANCE" OR subject:"SIM Insuance" OR '
-    'subject:"SIM Issuance" OR subject:"TUDOR AGENTS" OR '
-    "subject:TUDOR OR filename:TUDOR)"
-)
+
+def _build_gmail_query():
+    senders = " OR ".join(f"from:{email}" for email in Config.ALLOWED_SENDERS)
+    return (
+        f"({senders}) AND ("
+        'subject:"PARTNER PERFORMANCE" OR subject:"SIM Insuance" OR '
+        'subject:"SIM Issuance" OR subject:"TUDOR AGENTS" OR '
+        "subject:TUDOR OR filename:TUDOR)"
+    )
+
+
+GMAIL_QUERY = _build_gmail_query()
 
 
 TUDOR_QUERY = "subject:TUDOR OR filename:TUDOR OR subject:AGENT"
@@ -145,9 +151,8 @@ def _classify_message(subject, filenames):
 
 def _sender_allowed(sender):
     sender = (sender or "").lower()
-    # Only accept emails from the specific sender
-    allowed_sender = "a_lamek.omullo@ke.airtel.com"
-    return allowed_sender in sender
+    # Accept emails from specific Airtel senders
+    return any(allowed in sender for allowed in Config.ALLOWED_SENDERS)
 
 
 def _save_partner_report(synced_email, parsed):
