@@ -225,6 +225,8 @@ def _save_tudor_report(synced_email, parsed):
     db.session.add(report)
     db.session.flush()
 
+    print(f"Saving {len(parsed.get('agents', []))} agents for report {report.id}")
+
     for agent in parsed.get("agents", []):
         db.session.add(
             TudorAgent(
@@ -318,10 +320,15 @@ def process_message(service, message):
     elif report_type == "tudor_agents":
         excel_part = attachment_parts[0] if attachment_parts else None
         if not excel_part:
+            print(f"No attachment found for Tudor email: {subject}")
             db.session.rollback()
             return False
+        print(f"Processing Tudor attachment: {excel_part.get('filename', 'unknown')}")
         file_bytes = _download_attachment(service, message_id, excel_part)
         parsed = parse_tudor_agents_excel(file_bytes, subject, received_at)
+        print(
+            f"Parsed Tudor data: {parsed.get('total_agents')} agents, {parsed.get('active_agents')} active"
+        )
         _save_tudor_report(synced_email, parsed)
 
     db.session.commit()

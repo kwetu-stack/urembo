@@ -56,9 +56,18 @@ def _parse_report_date(subject, fallback=None):
         r"(\d{2})-(\d{2})-(\d{4})",
     ]
     months = {
-        "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4,
-        "MAY": 5, "JUNE": 6, "JULY": 7, "AUGUST": 8,
-        "SEPTEMBER": 9, "OCTOBER": 10, "NOVEMBER": 11, "DECEMBER": 12,
+        "JANUARY": 1,
+        "FEBRUARY": 2,
+        "MARCH": 3,
+        "APRIL": 4,
+        "MAY": 5,
+        "JUNE": 6,
+        "JULY": 7,
+        "AUGUST": 8,
+        "SEPTEMBER": 9,
+        "OCTOBER": 10,
+        "NOVEMBER": 11,
+        "DECEMBER": 12,
     }
     upper = subject.upper()
     match = re.search(patterns[0], upper)
@@ -83,7 +92,9 @@ def _table_rows(soup):
     rows = []
     for table in soup.find_all("table"):
         for tr in table.find_all("tr"):
-            cells = [cell.get_text(" ", strip=True) for cell in tr.find_all(["td", "th"])]
+            cells = [
+                cell.get_text(" ", strip=True) for cell in tr.find_all(["td", "th"])
+            ]
             if cells:
                 rows.append(cells)
     return rows
@@ -150,26 +161,30 @@ def parse_sim_utilization_excel(file_bytes, subject, received_at=None):
 
     records = []
     for _, row in df.iterrows():
-        records.append({
-            "item_serial_number": _clean_text(row.get("item_serial_number")),
-            "distributor_name": _clean_text(row.get("distributorname")),
-            "order_date": _clean_datetime(row.get("orderdate")),
-            "kyc_msisdn": _clean_identifier(row.get("kyc_msisdn")),
-            "served_msisdn": _clean_identifier(row.get("servedmsisdn")),
-            "kyc_created_on": _clean_datetime(row.get("kyc_createdon")),
-            "activation_time": _clean_datetime(row.get("activation_time")),
-            "device_technology": _clean_text(row.get("devicetechnology")),
-            "recharge_amount": _clean_number(row.get("rechargeamount")),
-            "retailer_msisdn": _clean_identifier(row.get("retailer_msisdn")),
-            "zone_name": _clean_text(row.get("zone_name")),
-        })
+        records.append(
+            {
+                "item_serial_number": _clean_text(row.get("item_serial_number")),
+                "distributor_name": _clean_text(row.get("distributorname")),
+                "order_date": _clean_datetime(row.get("orderdate")),
+                "kyc_msisdn": _clean_identifier(row.get("kyc_msisdn")),
+                "served_msisdn": _clean_identifier(row.get("servedmsisdn")),
+                "kyc_created_on": _clean_datetime(row.get("kyc_createdon")),
+                "activation_time": _clean_datetime(row.get("activation_time")),
+                "device_technology": _clean_text(row.get("devicetechnology")),
+                "recharge_amount": _clean_number(row.get("rechargeamount")),
+                "retailer_msisdn": _clean_identifier(row.get("retailer_msisdn")),
+                "zone_name": _clean_text(row.get("zone_name")),
+            }
+        )
 
     total = len(records)
     activated = sum(1 for r in records if r["activation_time"] is not None)
     utilization = round((activated / total) * 100, 2) if total else 0.0
 
     dso_id = _clean_identifier(df.iloc[0].get("dsoid")) if not df.empty else None
-    distributor = _clean_text(df.iloc[0].get("distributorname")) if not df.empty else None
+    distributor = (
+        _clean_text(df.iloc[0].get("distributorname")) if not df.empty else None
+    )
 
     return {
         "report_date": _parse_report_date(subject, received_at),
@@ -182,7 +197,7 @@ def parse_sim_utilization_excel(file_bytes, subject, received_at=None):
     }
 
 
-TUDOR_HEADER_MARKERS = {"AGENT", "AGENT NAME", "AGENT STATUS"}
+TUDOR_HEADER_MARKERS = {"AGENT", "AGENT NAME", "AGENT STATUS", "AGENT ID"}
 
 
 def _read_tudor_sheet(file_bytes, max_header_row=10):
@@ -196,42 +211,75 @@ def _read_tudor_sheet(file_bytes, max_header_row=10):
             header_row = index
             break
 
-    df = raw.iloc[header_row + 1:].copy()
+    df = raw.iloc[header_row + 1 :].copy()
     df.columns = [str(c).strip().upper() for c in raw.iloc[header_row].tolist()]
     return df
 
 
 def parse_tudor_agents_excel(file_bytes, subject, received_at=None):
-    df = _read_tudor_sheet(file_bytes)
+    try:
+        df = _read_tudor_sheet(file_bytes)
+    except Exception as e:
+        print(f"Error reading Tudor Excel file: {e}")
+        return {
+            "report_date": _parse_report_date(subject, received_at),
+            "total_agents": 0,
+            "active_agents": 0,
+            "ama_1plus_count": 0,
+            "qama_count": 0,
+            "agents": [],
+        }
 
     agents = []
     for _, row in df.iterrows():
-        agent_id = _clean_identifier(row.get("AGENT"))
+        # Try multiple column name variations
+        agent_id = (
+            _clean_identifier(row.get("AGENT ID"))
+            or _clean_identifier(row.get("AGENT"))
+            or _clean_identifier(row.get("AGENTID"))
+        )
         if not agent_id:
             continue
-        ama = _clean_text(row.get("AMA 1+"))
+
+        agent_name = (
+            _clean_text(row.get("AGENT NAME"))
+            or _clean_text(row.get("AGENTNAME"))
+            or _clean_text(row.get("AGENT"))
+        )
+        site = _clean_text(row.get("SITE"))
+        tse = _clean_text(row.get("TSE"))
+
+        ama = _clean_text(row.get("AMA 1+")) or _clean_text(row.get("AMA1+"))
         qama_value = _clean_text(row.get("QAMA"))
         qdrso = _clean_text(row.get("QDRSO"))
-        agents.append({
-            "agent_id": agent_id,
-            "agent_name": _clean_text(row.get("AGENT NAME")),
-            "site": _clean_text(row.get("SITE")),
-            "tse": _clean_text(row.get("TSE")),
-            "ama_1plus": ama.upper() if ama else None,
-            "qama": qama_value.upper() if qama_value else None,
-            "qdrso": qdrso.upper() if qdrso else None,
-            "agent_status": _clean_text(row.get("AGENT STATUS")),
-        })
+        agent_status = _clean_text(row.get("AGENT STATUS")) or _clean_text(
+            row.get("AGENTSTATUS")
+        )
+
+        agents.append(
+            {
+                "agent_id": agent_id,
+                "agent_name": agent_name,
+                "site": site,
+                "tse": tse,
+                "ama_1plus": ama.upper() if ama else None,
+                "qama": qama_value.upper() if qama_value else None,
+                "qdrso": qdrso.upper() if qdrso else None,
+                "agent_status": agent_status,
+            }
+        )
 
     active = sum(1 for a in agents if (a["agent_status"] or "").lower() == "active")
-    ama = sum(1 for a in agents if a["ama_1plus"] == "YES")
-    qama = sum(1 for a in agents if a["qama"] == "YES")
+    ama_count = sum(1 for a in agents if a["ama_1plus"] == "YES")
+    qama_count = sum(1 for a in agents if a["qama"] == "YES")
+
+    print(f"Parsed {len(agents)} Tudor agents from Excel file")
 
     return {
         "report_date": _parse_report_date(subject, received_at),
         "total_agents": len(agents),
         "active_agents": active,
-        "ama_1plus_count": ama,
-        "qama_count": qama,
+        "ama_1plus_count": ama_count,
+        "qama_count": qama_count,
         "agents": agents,
     }
