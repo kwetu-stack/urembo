@@ -19,6 +19,7 @@ from models import (
     TudorAgent,
     TudorAgentReport,
 )
+
 from services.analytics import (
     get_agents_page,
     get_dashboard_data,
@@ -27,6 +28,7 @@ from services.analytics import (
     get_tudor_summary,
     get_sim_verification,
 )
+
 from services.sync_service import (
     GMAIL_QUERY,
     _build_gmail_query,
@@ -34,6 +36,7 @@ from services.sync_service import (
     inspect_tudor_messages,
     sync_gmail_reports,
 )
+
 from services.token_store import has_connected_account
 
 dashboard_bp = Blueprint("dashboard", __name__)
@@ -49,6 +52,10 @@ def login_required(view):
     return wrapped
 
 
+# ======================================================
+# DASHBOARD
+# ======================================================
+
 @dashboard_bp.route("/dashboard")
 @login_required
 def dashboard():
@@ -56,17 +63,44 @@ def dashboard():
     return render_template("dashboard.html", **data)
 
 
+# ======================================================
+# SIM UTILIZATION
+# ======================================================
+
 @dashboard_bp.route("/sim-utilization")
 @login_required
 def sim_utilization():
     data = get_sim_utilization_page()
     return render_template("sim_utilization.html", **data)
 
+
+# ======================================================
+# SIM VERIFICATION
+# ======================================================
+
 @dashboard_bp.route("/sim-verification")
 @login_required
 def sim_verification():
-    return render_template("sim_verification.html")
 
+    retailer = request.args.get("retailer", "").strip()
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    data = get_sim_verification(
+        retailer_msisdn=retailer if retailer else None,
+        start_date=start_date if start_date else None,
+        end_date=end_date if end_date else None,
+    )
+
+    return render_template(
+        "sim_verification.html",
+        **data,
+    )
+
+
+# ======================================================
+# PARTNER PERFORMANCE
+# ======================================================
 
 @dashboard_bp.route("/partner-performance")
 @login_required
@@ -74,6 +108,10 @@ def partner_performance():
     data = get_partner_performance_page()
     return render_template("partner_performance.html", **data)
 
+
+# ======================================================
+# AGENTS
+# ======================================================
 
 @dashboard_bp.route("/agents")
 @login_required
@@ -86,10 +124,15 @@ def agents():
     return render_template("agents.html", **data)
 
 
+# ======================================================
+# API - DASHBOARD
+# ======================================================
+
 @dashboard_bp.route("/api/dashboard")
 @login_required
 def api_dashboard():
     data = get_dashboard_data()
+
     return jsonify(
         {
             "commission": (
@@ -98,9 +141,15 @@ def api_dashboard():
             "contract_status": (
                 data["partner"].contract_status if data["partner"] else None
             ),
-            "sim_utilization": data["sim"].utilization_rate if data["sim"] else None,
-            "total_sims": data["sim"].total_sims if data["sim"] else None,
-            "active_agents": data["tudor"].active_agents if data["tudor"] else None,
+            "sim_utilization": (
+                data["sim"].utilization_rate if data["sim"] else None
+            ),
+            "total_sims": (
+                data["sim"].total_sims if data["sim"] else None
+            ),
+            "active_agents": (
+                data["tudor"].active_agents if data["tudor"] else None
+            ),
             "alerts": data["alerts"],
             "commission_trend": data["commission_trend"],
             "utilization_trend": data["utilization_trend"],
@@ -108,11 +157,21 @@ def api_dashboard():
     )
 
 
+# ======================================================
+# API - DIAGNOSTICS
+# ======================================================
+
 @dashboard_bp.route("/api/diagnostics")
 @login_required
 def api_diagnostics():
-    """What sync has stored, and how Tudor-looking mail in the inbox would be classified."""
-    synced = SyncedEmail.query.order_by(SyncedEmail.received_at.desc()).limit(25).all()
+
+    synced = (
+        SyncedEmail.query
+        .order_by(SyncedEmail.received_at.desc())
+        .limit(25)
+        .all()
+    )
+
     app = current_app._get_current_object()
 
     def scan(label, fn):
@@ -120,10 +179,14 @@ def api_diagnostics():
             return fn(app)
         except Exception:
             current_app.logger.exception("%s scan failed", label)
-            return {"error": f"{label} scan failed", "messages": []}
+            return {
+                "error": f"{label} scan failed",
+                "messages": [],
+            }
 
     tudor_scan = scan("Tudor inbox", inspect_tudor_messages)
     attachment_scan = scan("Attachment", inspect_attachment_messages)
+
     return jsonify(
         {
             "gmail_query": _build_gmail_query(),
@@ -141,7 +204,9 @@ def api_diagnostics():
                     "subject": email.subject,
                     "sender": email.sender,
                     "received_at": (
-                        email.received_at.isoformat() if email.received_at else None
+                        email.received_at.isoformat()
+                        if email.received_at
+                        else None
                     ),
                     "report_type": email.report_type,
                 }
@@ -153,39 +218,30 @@ def api_diagnostics():
     )
 
 
+# ======================================================
+# API - MANUAL SYNC
+# ======================================================
+
 @dashboard_bp.route("/api/sync", methods=["POST"])
 @login_required
 def api_sync():
     try:
         result = sync_gmail_reports(current_app._get_current_object())
         return jsonify(result)
+
     except Exception:
         current_app.logger.exception("Gmail sync failed")
+
         return (
             jsonify(
                 {
                     "processed": 0,
                     "failed": 0,
-                    "error": "Sync failed. Please try again or contact support if it keeps happening.",
+                    "error": (
+                        "Sync failed. Please try again "
+                        "or contact support if it keeps happening."
+                    ),
                 }
             ),
             500,
         )
-@dashboard_bp.route("/sim-verification")
-@login_required
-def sim_verification():
-
-    retailer = request.args.get("retailer", "").strip()
-    start_date = request.args.get("start_date", "")
-    end_date = request.args.get("end_date", "")
-
-    data = get_sim_verification(
-        retailer_msisdn=retailer if retailer else None,
-        start_date=start_date if start_date else None,
-        end_date=end_date if end_date else None,
-    )
-
-    return render_template(
-        "sim_verification.html",
-        **data
-    )
