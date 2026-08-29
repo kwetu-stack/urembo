@@ -77,6 +77,43 @@
     </tbody>
   </table>
 </section>
+
+<section class="panel">
+  <h2>Individual SIM Records (Latest 100)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Serial Number</th>
+        <th>KYC MSISDN</th>
+        <th>Served MSISDN</th>
+        <th>Retailer MSISDN</th>
+        <th>Order Date</th>
+        <th>Activation Date</th>
+        <th>Technology</th>
+        <th>Recharge</th>
+        <th>Zone</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for record in sim_records %}
+      <tr>
+        <td>{{ record.item_serial_number or '—' }}</td>
+        <td>{{ record.kyc_msisdn or '—' }}</td>
+        <td>{{ record.served_msisdn or '—' }}</td>
+        <td>{{ record.retailer_msisdn or '—' }}</td>
+        <td>{{ record.order_date.strftime('%Y-%m-%d') if record.order_date else '—' }}</td>
+        <td>{{ record.activation_time.strftime('%Y-%m-%d') if record.activation_time else '—' }}</td>
+        <td>{{ record.device_technology or '—' }}</td>
+        <td>{{ record.recharge_amount if record.recharge_amount else '—' }}</td>
+        <td>{{ record.zone_name or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if latest and latest.total_sims > 100 %}
+  <p class="note">Showing 100 of {{ latest.total_sims }} total records. Full dataset available in database.</p>
+  {% endif %}
+</section>
 {% else %}
 <section class="panel empty-state">
   <h2>No SIM utilization reports yet</h2>
