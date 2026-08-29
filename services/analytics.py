@@ -267,3 +267,88 @@ def get_agents_page(search=None, status=None, page=1, per_page=AGENTS_PER_PAGE):
         "search": search,
         "status": status,
     }
+from datetime import datetime
+from models import SimUtilizationRecord
+
+
+def get_sim_verification_page(retailer_msisdn=None, start_date=None, end_date=None):
+    query = SimUtilizationRecord.query
+
+    if retailer_msisdn:
+        query = query.filter(
+            SimUtilizationRecord.retailer_msisdn == retailer_msisdn
+        )
+
+    if start_date:
+        query = query.filter(
+            func.date(SimUtilizationRecord.activation_time) >= start_date
+        )
+
+    if end_date:
+        query = query.filter(
+            func.date(SimUtilizationRecord.activation_time) <= end_date
+        )
+
+    records = (
+        query.order_by(
+            SimUtilizationRecord.activation_time.desc()
+        ).all()
+    )
+
+    total = len(records)
+    activated = sum(
+        1 for r in records if r.activation_time
+    )
+
+    reimbursement = activated * 20
+
+    return {
+        "records": records,
+        "retailer_msisdn": retailer_msisdn,
+        "start_date": start_date,
+        "end_date": end_date,
+        "total": total,
+        "activated": activated,
+        "reimbursement": reimbursement,
+    }
+    from models import SimUtilizationRecord
+from datetime import datetime
+
+
+def get_sim_verification(retailer_msisdn=None, start_date=None, end_date=None):
+    query = SimUtilizationRecord.query
+
+    if retailer_msisdn:
+        query = query.filter(
+            SimUtilizationRecord.retailer_msisdn == retailer_msisdn
+        )
+
+    if start_date:
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        query = query.filter(
+            SimUtilizationRecord.activation_time >= start
+        )
+
+    if end_date:
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        query = query.filter(
+            SimUtilizationRecord.activation_time <= end
+        )
+
+    records = (
+        query.order_by(
+            SimUtilizationRecord.activation_time.desc()
+        ).all()
+    )
+
+    activated = len(records)
+    reimbursement = activated * 20
+
+    return {
+        "records": records,
+        "activated": activated,
+        "reimbursement": reimbursement,
+        "retailer": retailer_msisdn,
+        "start_date": start_date,
+        "end_date": end_date,
+    }

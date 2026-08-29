@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}SIM Verification{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <h2>SIM Verification</h2>
+    <p class="text-muted">
+        Verify activated SIM cards for a Retailer MSISDN.
+    </p>
+
+    <form method="GET" action="{{ url_for('dashboard.sim_verification') }}">
+
+        <div class="row mb-3">
+
+            <div class="col-md-3">
+                <label class="form-label">Retailer MSISDN</label>
+                <input
+                    type="text"
+                    class="form-control"
+                    name="retailer"
+                    value="{{ retailer or '' }}"
+                    placeholder="10800302">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">From</label>
+                <input
+                    type="date"
+                    class="form-control"
+                    name="start_date"
+                    value="{{ start_date or '' }}">
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">To</label>
+                <input
+                    type="date"
+                    class="form-control"
+                    name="end_date"
+                    value="{{ end_date or '' }}">
+            </div>
+
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-danger w-100">
+                    Search
+                </button>
+            </div>
+
+        </div>
+
+    </form>
+
+    {% if retailer %}
+
+    <div class="row mb-4">
+
+        <div class="col-md-6">
+
+            <div class="card">
+
+                <div class="card-body">
+
+                    <h5>Total Activated SIMs</h5>
+
+                    <h2>{{ activated }}</h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-md-6">
+
+            <div class="card">
+
+                <div class="card-body">
+
+                    <h5>Expected Reimbursement</h5>
+
+                    <h2>KES {{ reimbursement }}</h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <table class="table table-striped table-bordered">
+
+        <thead class="table-danger">
+
+            <tr>
+
+                <th>Serial Number</th>
+                <th>Served MSISDN</th>
+                <th>Activation Time</th>
+                <th>Recharge</th>
+                <th>Zone</th>
+
+            </tr>
+
+        </thead>
+
+        <tbody>
+
+        {% for sim in records %}
+
+        <tr>
+
+            <td>{{ sim.item_serial_number }}</td>
+            <td>{{ sim.served_msisdn }}</td>
+            <td>{{ sim.activation_time }}</td>
+            <td>{{ sim.recharge_amount }}</td>
+            <td>{{ sim.zone_name }}</td>
+
+        </tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}

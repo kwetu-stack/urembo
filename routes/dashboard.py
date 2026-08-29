@@ -25,6 +25,7 @@ from services.analytics import (
     get_partner_performance_page,
     get_sim_utilization_page,
     get_tudor_summary,
+    get_sim_verification,
 )
 from services.sync_service import (
     GMAIL_QUERY,
@@ -60,6 +61,11 @@ def dashboard():
 def sim_utilization():
     data = get_sim_utilization_page()
     return render_template("sim_utilization.html", **data)
+
+@dashboard_bp.route("/sim-verification")
+@login_required
+def sim_verification():
+    return render_template("sim_verification.html")
 
 
 @dashboard_bp.route("/partner-performance")
@@ -165,3 +171,21 @@ def api_sync():
             ),
             500,
         )
+@dashboard_bp.route("/sim-verification")
+@login_required
+def sim_verification():
+
+    retailer = request.args.get("retailer", "").strip()
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    data = get_sim_verification(
+        retailer_msisdn=retailer if retailer else None,
+        start_date=start_date if start_date else None,
+        end_date=end_date if end_date else None,
+    )
+
+    return render_template(
+        "sim_verification.html",
+        **data
+    )
