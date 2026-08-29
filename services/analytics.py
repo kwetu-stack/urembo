@@ -342,13 +342,16 @@ def get_sim_verification(retailer_msisdn=None, start_date=None, end_date=None):
     )
 
     activated = len(records)
-    reimbursement = activated * 20
+    claim_rate = 20
+    claimable_sims = activated
+    claim_amount = claimable_sims * claim_rate
 
     return {
         "records": records,
-        "activated": activated,
-        "reimbursement": reimbursement,
         "retailer": retailer_msisdn,
         "start_date": start_date,
         "end_date": end_date,
+        "claimable_sims": claimable_sims,
+        "claim_rate": claim_rate,
+        "claim_amount": claim_amount,
     }

@@ -1,4 +1,6 @@
 from functools import wraps
+from io import BytesIO
+from openpyxl import Workbook
 
 from flask import (
     Blueprint,
@@ -9,8 +11,8 @@ from flask import (
     request,
     session,
     url_for,
+    send_file,
 )
-
 from config import Config
 from models import (
     PartnerPerformanceReport,
@@ -98,6 +100,70 @@ def sim_verification():
     )
 
 
+# ======================================================
+# EXPORT SIM VERIFICATION TO EXCEL
+# ======================================================
+
+@dashboard_bp.route("/sim-verification/export")
+@login_required
+def export_sim_verification():
+
+    retailer = request.args.get("retailer", "").strip()
+    start_date = request.args.get("start_date", "")
+    end_date = request.args.get("end_date", "")
+
+    data = get_sim_verification(
+        retailer_msisdn=retailer if retailer else None,
+        start_date=start_date if start_date else None,
+        end_date=end_date if end_date else None,
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "SIM Verification"
+
+    # Report Header
+    ws.append(["SIM VERIFICATION REPORT"])
+    ws.append([])
+    ws.append(["Retailer MSISDN", retailer])
+    ws.append(["From", start_date])
+    ws.append(["To", end_date])
+    ws.append(["Activated SIMs", data["claimable_sims"]])
+    ws.append(["Rate per SIM", data["claim_rate"]])
+    ws.append(["Claimable Amount", data["claim_amount"]])
+    ws.append([])
+
+    # Table Header
+    ws.append([
+        "Serial Number",
+        "Served MSISDN",
+        "Activation Time",
+        "Recharge",
+        "Zone"
+    ])
+
+    # Data
+    for sim in data["records"]:
+        ws.append([
+            sim.item_serial_number,
+            sim.served_msisdn,
+            sim.activation_time.strftime("%Y-%m-%d %H:%M") if sim.activation_time else "",
+            sim.recharge_amount,
+            sim.zone_name,
+        ])
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"SIM_Claim_{retailer}.xlsx"
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 # ======================================================
 # PARTNER PERFORMANCE
 # ======================================================

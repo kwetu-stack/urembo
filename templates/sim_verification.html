@@ -44,28 +44,49 @@
             </div>
 
             <div class="col-md-3 d-flex align-items-end">
-                <button class="btn btn-danger w-100">
-                    Search
-                </button>
-            </div>
+
+    <button class="btn btn-danger w-100 me-2">
+        Search
+    </button>
+
+</div>
 
         </div>
 
     </form>
+    {% if retailer %}
+
+<div class="mb-3">
+
+    <a href="{{ url_for(
+        'dashboard.export_sim_verification',
+        retailer=retailer,
+        start_date=start_date,
+        end_date=end_date
+    ) }}"
+    class="btn btn-success">
+
+        📥 Export Claim Report (Excel)
+
+    </a>
+
+</div>
+
+{% endif %}
 
     {% if retailer %}
 
     <div class="row mb-4">
 
-        <div class="col-md-6">
+        <div class="col-md-4">
 
             <div class="card">
 
-                <div class="card-body">
+                <div class="card-body text-center">
 
-                    <h5>Total Activated SIMs</h5>
+                    <h5>Activated SIMs</h5>
 
-                    <h2>{{ activated }}</h2>
+                    <h2>{{ claimable_sims }}</h2>
 
                 </div>
 
@@ -73,15 +94,31 @@
 
         </div>
 
-        <div class="col-md-6">
+        <div class="col-md-4">
 
             <div class="card">
 
-                <div class="card-body">
+                <div class="card-body text-center">
 
-                    <h5>Expected Reimbursement</h5>
+                    <h5>Rate per SIM</h5>
 
-                    <h2>KES {{ reimbursement }}</h2>
+                    <h2>KES {{ claim_rate }}</h2>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="col-md-4">
+
+            <div class="card">
+
+                <div class="card-body text-center">
+
+                    <h5>Claimable Amount</h5>
+
+                    <h2>KES {{ "{:,.0f}".format(claim_amount) }}</h2>
 
                 </div>
 
@@ -96,13 +133,11 @@
         <thead class="table-danger">
 
             <tr>
-
                 <th>Serial Number</th>
                 <th>Served MSISDN</th>
                 <th>Activation Time</th>
                 <th>Recharge</th>
                 <th>Zone</th>
-
             </tr>
 
         </thead>

@@ -143,3 +143,37 @@ th { color: var(--muted); font-size: .85rem; }
   .navbar { flex-direction: column; align-items: stretch; }
   .nav-actions { justify-content: stretch; }
 }
+/* ==========================================
+   SIM VERIFICATION SUMMARY
+========================================== */
+
+.summary-cards{
+    display:flex;
+    gap:20px;
+    margin:25px 0;
+    flex-wrap:wrap;
+}
+
+.summary-card{
+    flex:1;
+    min-width:220px;
+    background:#ffffff;
+    border-radius:10px;
+    padding:20px;
+    text-align:center;
+    box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    border-top:4px solid #d71920;
+}
+
+.summary-card h4{
+    margin:0;
+    font-size:16px;
+    color:#666;
+}
+
+.summary-card h2{
+    margin-top:10px;
+    font-size:32px;
+    color:#d71920;
+    font-weight:bold;
+}
